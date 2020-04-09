@@ -45,7 +45,7 @@ function Remove-FslMultiOst {
                             $mailboxOst | Where-Object { $_.Name -ne $latestOst.Name } | Remove-Item -Force -ErrorAction Stop
                         }
                         catch {
-                            #Write-log -level Error "Failed to delete ost files in $vhd for $mailbox"
+                            Write-Warning "Did not delete orphaned ost file(s)"
                         }
                     }
                     else {
