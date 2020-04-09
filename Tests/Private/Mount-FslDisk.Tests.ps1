@@ -8,16 +8,21 @@ Describe "Describing $sut.Trimend('.ps1')" {
     Context "Input" {
 
         $Path = 'TestDrive:\ThisDoesNotExist.vhdx'
+        #New-Item -ItemType Directory -Path 'TestDrive:\mountHere'
 
-        Mock -CommandName Mount-DiskImage  { $null }
-        Mock -CommandName Get-DiskImage  { $null }
-        Mock -CommandName New-Item  { $null }
-        Mock -CommandName Dismount-DiskImage  { $null }
-        Mock -CommandName Add-PartitionAccessPath  { $null }
-        Mock -CommandName Remove-Item  { $null }
+        Mock -CommandName Mount-DiskImage -MockWith { [pscustomobject]@{
+            Imagepath = $Path
+            Number = 4
+        } }
+        Mock -CommandName Get-DiskImage -MockWith { $null }
+        Mock -CommandName New-Item -MockWith { $null }
+        Mock -CommandName Dismount-DiskImage -MockWith { $null }
+        Mock -CommandName Add-PartitionAccessPath -MockWith { $null }
+        Mock -CommandName Remove-Item -MockWith { $null }
+        Mock -CommandName Join-Path -MockWith { 'TestDrive:\mountHere' }
 
         It "Takes input via param" {
-            Mount-FslDisk -Path $Path | Should -BeNullOrEmpty     
+            Mount-FslDisk -Path $Path -ErrorAction Stop | Should -BeNullOrEmpty     
         }
 
         It "Takes input via paramwith passthru" {
