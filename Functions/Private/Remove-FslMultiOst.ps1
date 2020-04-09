@@ -23,16 +23,16 @@ function Remove-FslMultiOst {
         }
         else {
 
-            $count = $ost | Measure-Object 
+            $count = ($ost | Measure-Object).Count
 
-            if ($count.Count -gt 1) {
+            if ($count -gt 1) {
 
                 $mailboxes = $ost.BaseName.trimend('(', ')', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0') | Group-Object | Select-Object -ExpandProperty Name
 
                 foreach ($mailbox in $mailboxes) {
                     $mailboxOst = $ost | Where-Object { $_.BaseName.StartsWith($mailbox) }
 
-                    $count = $mailboxOst | Measure-Object
+                    $count = ($mailboxOst | Measure-Object).Count
 
                     #Write-Log  "Found $count ost files for $mailbox"
 

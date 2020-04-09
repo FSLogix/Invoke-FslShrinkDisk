@@ -2,7 +2,7 @@ Param ( $disk )
 
 $PSDefaultParameterValues = @{ "Write-Log:Path" = $LogFilePath }
 
-$originalSize = #ToDo
+#$originalSize = #ToDo
 
 switch ($true) {
     $DeleteOlderThanDays {
