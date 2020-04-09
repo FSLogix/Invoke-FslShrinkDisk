@@ -28,8 +28,6 @@ function Mount-FslDisk {
     } # Begin
     PROCESS {
 
-        # FSLogix Disk Partition Number this won't work with vhds created with MS tools as their main partition number is 2
-
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage -ErrorAction Stop

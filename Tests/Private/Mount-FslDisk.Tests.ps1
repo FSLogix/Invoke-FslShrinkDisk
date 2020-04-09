@@ -21,31 +21,31 @@ Describe "Describing $sut.Trimend('.ps1')" {
         }
 
         It "Takes input via paramwith passthru" {
-            Mount-FslDisk -Path $Path -Passthru | Should -BeNullOrEmpty
+            Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Should -BeNullOrEmpty
         }
 
         It "Takes input via param Alias" {
-            Mount-FslDisk -FullName $Path | Should -BeNullOrEmpty     
+            Mount-FslDisk -FullName $Path -ErrorAction Stop | Should -BeNullOrEmpty     
         }
 
         It "Takes input via pipeline" {
-            $Path | Mount-FslDisk | Should -BeNullOrEmpty     
+            $Path | Mount-FslDisk -ErrorAction Stop | Should -BeNullOrEmpty     
         }
 
         It "Takes input via named pipeline" {
             [PSCustomObject]@{
                 Path = $Path
-            } | Mount-FslDisk | Should -BeNullOrEmpty     
+            } | Mount-FslDisk -ErrorAction Stop | Should -BeNullOrEmpty     
         }
 
         It "Takes input via named pipeline alias" {
             [PSCustomObject]@{
                 FullName = $Path
-            } | Mount-FslDisk | Should -BeNullOrEmpty     
+            } | Mount-FslDisk -ErrorAction Stop | Should -BeNullOrEmpty     
         }
 
         It "Takes input positionally" {
-            Mount-FslDisk $Path | Should -BeNullOrEmpty     
+            Mount-FslDisk $Path -ErrorAction Stop | Should -BeNullOrEmpty     
         }
     }
 }

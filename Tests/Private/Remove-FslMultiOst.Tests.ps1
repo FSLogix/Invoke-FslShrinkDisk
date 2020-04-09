@@ -11,18 +11,18 @@ Describe "Describing $sut.Trimend('.ps1')" {
         New-Item -Path Testdrive:\mailbox.ost
 
         It "Takes input via param" {
-            Remove-FslMultiOst -Path $td | Should -BeNullOrEmpty     
+            Remove-FslMultiOst -Path $td -ErrorAction Stop | Should -BeNullOrEmpty     
         }
         It "Takes input via pipeline" {
-            $td | Remove-FslMultiOst | Should -BeNullOrEmpty     
+            $td | Remove-FslMultiOst -ErrorAction Stop | Should -BeNullOrEmpty     
         }
         It "Takes input via named pipeline" {
             [PSCustomObject]@{
                 Path = $td
-            } | Remove-FslMultiOst | Should -BeNullOrEmpty     
+            } | Remove-FslMultiOst -ErrorAction Stop | Should -BeNullOrEmpty     
         }
         It "Takes input positionally" {
-            Remove-FslMultiOst $td | Should -BeNullOrEmpty     
+            Remove-FslMultiOst $td -ErrorAction Stop | Should -BeNullOrEmpty     
         }
     }
 
@@ -31,7 +31,7 @@ Describe "Describing $sut.Trimend('.ps1')" {
         New-Item -Path "$td\my.email.ost" -Force
 
         It "It doesn't do anything if only 1 ost" {
-            Remove-FslMultiOst $td
+            Remove-FslMultiOst $td 
             (Get-ChildItem $td).Name | should -Be "my.email.ost"
         }
 
