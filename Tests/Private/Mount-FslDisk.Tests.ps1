@@ -7,19 +7,45 @@ $here = $here | Split-Path -Parent | Split-Path -Parent
 Describe "Describing $sut.Trimend('.ps1')" {
     Context "Input" {
 
+        $Path = 'TestDrive:\ThisDoesNotExist.vhdx'
+
+        Mock -CommandName Mount-DiskImage  { $null }
+        Mock -CommandName Get-DiskImage  { $null }
+        Mock -CommandName New-Item  { $null }
+        Mock -CommandName Dismount-DiskImage  { $null }
+        Mock -CommandName Add-PartitionAccessPath  { $null }
+        Mock -CommandName Remove-Item  { $null }
+
         It "Takes input via param" {
-            Remove-FslMultiOst -Path $td | Should -BeNullOrEmpty     
+            Mount-FslDisk -Path $Path | Should -BeNullOrEmpty     
         }
+
+        It "Takes input via paramwith passthru" {
+            Mount-FslDisk -Path $Path -Passthru | Should -BeNullOrEmpty
+        }
+
+        It "Takes input via param Alias" {
+            Mount-FslDisk -FullName $Path | Should -BeNullOrEmpty     
+        }
+
         It "Takes input via pipeline" {
-            $td | Remove-FslMultiOst | Should -BeNullOrEmpty     
+            $Path | Mount-FslDisk | Should -BeNullOrEmpty     
         }
+
         It "Takes input via named pipeline" {
             [PSCustomObject]@{
-                Path = $td
-            } | Remove-FslMultiOst | Should -BeNullOrEmpty     
+                Path = $Path
+            } | Mount-FslDisk | Should -BeNullOrEmpty     
         }
+
+        It "Takes input via named pipeline alias" {
+            [PSCustomObject]@{
+                FullName = $Path
+            } | Mount-FslDisk | Should -BeNullOrEmpty     
+        }
+
         It "Takes input positionally" {
-            Remove-FslMultiOst $td | Should -BeNullOrEmpty     
+            Mount-FslDisk $Path | Should -BeNullOrEmpty     
         }
     }
 }

@@ -14,6 +14,12 @@ function Mount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
+        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
+        [System.String]$PartitionNumber = 1,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
         [Switch]$PassThru
     )
 
@@ -23,7 +29,6 @@ function Mount-FslDisk {
     PROCESS {
 
         # FSLogix Disk Partition Number this won't work with vhds created with MS tools as their main partition number is 2
-        $partitionNumber = 1
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
@@ -54,7 +59,7 @@ function Mount-FslDisk {
 
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
-                PartitionNumber = $partitionNumber
+                PartitionNumber = $PartitionNumber
                 AccessPath      = $mountPath
                 ErrorAction     = 'Stop'
             }
