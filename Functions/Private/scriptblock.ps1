@@ -2,20 +2,42 @@ Param ( $disk )
 
 $PSDefaultParameterValues = @{ "Write-Log:Path" = $LogFilePath }
 
+$originalSize = #ToDo
+
 switch ($true) {
     $DeleteOlderThanDays {
         if ($disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) { 
             try {
                 Remove-Item -ErrorAction Stop
+                <#
+                $logParam = @{
+                    $action       = 'Delete'
+                    $level        = 'Info'
+                    $message      = "$disk was deleted as it was older than $DeleteOlderThanDays days"
+                    $originalSize =
+                    $finalSize = 0
+                    $spaceSaved   = $originalSize - $finalSize
+                }
+                Write-Log @logParam
+                #>
             }
             catch {
+                <#
+                $action = 'Delete'
+                $level = 'Error'
+                $message = "$disk was not deleted"
+                $originalSize =
+                $finalSize = 
+                $spaceSaved = $originalSize - $finalSize
+                #>
                 Write-Log -Level Error "Could Not Delete $disk"
             }
         }
-        break 
+        break
     }
     $IgnoreLessThanGB {
         if ($disk.size -lt $IgnoreLessThanGB) {
+            $action = 'Ignore'
             Write-Log "$disk smaller than $IgnoreLessThanGB no action taken"
             break
         }
@@ -41,7 +63,7 @@ switch ($true) {
             }
             else {
                 $mount | DisMount-FslDisk
-                Write-Log "$disk not resized due to insufficient free space"
+                Write-Log "$disk not resized due to insufficient free space inside disk"
             }
         }
         catch {
