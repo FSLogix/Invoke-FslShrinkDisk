@@ -28,7 +28,12 @@ function Invoke-FslShrinkDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [System.String]$LogFilePath
+        [System.String]$LogFilePath,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true #ToDo
+        )]
+        [switch]$PassThru
     )
 
     BEGIN {
@@ -1037,7 +1042,8 @@ function Invoke-FslShrinkDisk {
         
 
         if ( ($diskList | Measure-Object).count -eq 0 ) {
-            Write-Warning "No files to process"
+            Write-Warning "No files to process in $Path exiting"
+            exit
         }
 
 
@@ -1086,7 +1092,7 @@ function Invoke-FslShrinkDisk {
                         }
                         else {
                             $mount | DisMount-FslDisk
-                            Write-Log "$disk not resized due to insufficient free space"
+                            Write-Log "$disk not resized due to insufficient free space inside disk"
                         }
                     }
                     catch {
