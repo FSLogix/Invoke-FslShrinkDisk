@@ -15,45 +15,44 @@ function Remove-FslMultiOst {
         Set-StrictMode -Version Latest
     } # Begin
     PROCESS {
+
+        If (-not (Test-Path $Path)) {
+            Write-Error "Cannot validate $Path exists"
+            break
+        }
+
         #Write-Log  "Getting ost files from $Path"
         $ost = Get-ChildItem -Path (Join-Path $Path *.ost)
         if ($null -eq $ost) {
-            #Write-log -level Warn "Did not find any ost files in $Path"
-            #$ostDelNum = 0
+            Write-Warning "Did not find any ost files in $Path"
+            break
         }
         else {
 
             $count = ($ost | Measure-Object).Count
 
-            if ($count -gt 1) {
+            #do nothing if only one ost
+            if ($count -le 1) { break }
 
-                $mailboxes = $ost.BaseName.trimend('(', ')', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0') | Group-Object | Select-Object -ExpandProperty Name
+            $mailboxes = $ost.BaseName.trimend('(', ')', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0') | Group-Object | Select-Object -ExpandProperty Name
 
-                foreach ($mailbox in $mailboxes) {
-                    $mailboxOst = $ost | Where-Object { $_.BaseName.StartsWith($mailbox) }
+            foreach ($mailbox in $mailboxes) {
+                $mailboxOst = $ost | Where-Object { $_.BaseName.StartsWith($mailbox) }
 
-                    $count = ($mailboxOst | Measure-Object).Count
+                $count = ($mailboxOst | Measure-Object).Count
 
-                    #Write-Log  "Found $count ost files for $mailbox"
+                #do nothing if only one ost for this mailbox
+                if ($count -le 1) { break }
 
-                    if ($count -gt 1) {
-
-                        $ostDelNum = $count - 1
-                        #Write-Log "Deleting $ostDelNum ost files"
-                        try {
-                            $latestOst = $mailboxOst | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1
-                            $mailboxOst | Where-Object { $_.Name -ne $latestOst.Name } | Remove-Item -Force -ErrorAction Stop
-                        }
-                        catch {
-                            Write-Warning "Did not delete orphaned ost file(s)"
-                        }
-                    }
-                    else {
-                        #Write-Log "Only One ost file found for $mailbox. No action taken"
-                        $ostDelNum = 0
-                    }
-
+                try {
+                    $latestOst = $mailboxOst | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1
+                    $mailboxOst | Where-Object { $_.Name -ne $latestOst.Name } | Remove-Item -Force -ErrorAction Stop
                 }
+                catch {
+                    Write-Warning "Did not delete the orphaned ost file(s)"
+                }
+                
+                
             }
         }
     } #Process
