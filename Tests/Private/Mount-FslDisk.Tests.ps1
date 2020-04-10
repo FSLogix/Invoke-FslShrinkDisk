@@ -80,4 +80,25 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Mount-FslDisk $Path -ErrorAction Stop | Should -BeNullOrEmpty     
         }
     }
+
+    Context "Logic" {
+
+        Mock -CommandName New-Item -MockWith { $null }
+        Mock -CommandName Dismount-DiskImage -MockWith { $null }
+        Mock -CommandName Add-PartitionAccessPath -MockWith { $null }
+        Mock -CommandName Remove-Item -MockWith { $null }
+        Mock -CommandName Join-Path -MockWith { 'TestDrive:\mountHere' }
+
+        It "It produces an mount path" {
+            Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Select-Object -ExpandProperty ImagePath | Should -Be $path
+        }
+
+        It "It produces an disknumber" {
+            Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskNumber | Should -Be 4
+        }
+
+        It "It produces an disknumber" {
+            Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Select-Object -ExpandProperty Path | Should -Be 'TestDrive:\mountHere'
+        }
+    }
 }
