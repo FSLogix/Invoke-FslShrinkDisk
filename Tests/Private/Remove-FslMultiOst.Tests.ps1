@@ -4,7 +4,7 @@ $sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
 $here = $here | Split-Path -Parent | Split-Path -Parent
 . "$here\Functions\$funcType\$sut"
 
-Describe "Describing $sut.Trimend('.ps1')" {
+Describe "Describing $($sut.Trimend('.ps1'))" {
     $td = 'Testdrive:\'
     Context "Input" {
 
