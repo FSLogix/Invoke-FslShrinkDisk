@@ -26,7 +26,7 @@ function Dismount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [Switch]$PassThru    
+        [Switch]$PassThru
     )
 
     BEGIN {
@@ -49,6 +49,7 @@ function Dismount-FslDisk {
             $junctionPointRemoved = $true
         }
         catch {
+            $junctionPointRemoved = $false
             Write-Error "Failed to remove the junction point to $Path"
         }
 
@@ -57,6 +58,7 @@ function Dismount-FslDisk {
             $mountRemoved = $true
         }
         catch {
+            $mountRemoved = $false
             Write-Error "Failed to dismount disk $ImagePath"
         }
 
@@ -66,6 +68,7 @@ function Dismount-FslDisk {
         }
         catch {
             Write-Error "Failed to delete temp mount directory $Path"
+            $directoryRemoved = $false
         }
 
         If ($PassThru) {
@@ -76,7 +79,11 @@ function Dismount-FslDisk {
             }
             Write-Output $output
         }
-        Write-Verbose "Dismounted $ImagePath"
+
+        if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
+            Write-Verbose "Dismounted $ImagePath"
+        }
+
     } #Process
     END { } #End
 }  #function Dismount-FslDisk
