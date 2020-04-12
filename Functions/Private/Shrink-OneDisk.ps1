@@ -25,11 +25,18 @@ function Shrink-OneDisk {
             ValuefromPipelineByPropertyName = $true,
             ValuefromPipeline = $true
         )]
-        [Int]$RatioFreeSpace = 0.2
+        [double]$RatioFreeSpace = 0.2,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
+        )]
+        [double]$PartitionNumber = 1
     )
 
     BEGIN {
         Set-StrictMode -Version Latest
+        #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
     } # Begin
     PROCESS {
@@ -41,6 +48,11 @@ function Shrink-OneDisk {
             FinalSizeGB    = $originalSizeGB
             SpaceSavedGB   = 0
             FullName       = $Disk.FullName
+        }
+
+        if ($Disk.Extension -ne 'vhd' -or $Disk.Extension -ne 'vhdx' ) {
+            $output.DiskState = 'NotDisk'
+            Write-Output $output
         }
 
 
@@ -75,16 +87,76 @@ function Shrink-OneDisk {
             break
         }
 
-        if (Test-Path 'odfc') {
-            Remove-FslMultiOst -Path $mount.Path
+        #Check for orphaned ost files inside disks
+        $profileDiskOstPath = Join-Path $mount.Path 'Profile\AppData\Local\Microsoft\Outlook'
+        $officeDiskOstPath = Join-Path $mount.Path 'ODFC\Outlook'
+        switch ($true) {
+            { Test-Path $profileDiskOstPath } {
+                Remove-FslMultiOst $profileDiskOstPath
+                break
+            }
+            { Test-Path $officeDiskOstPath } {
+                Remove-FslMultiOst $profileDiskOstPath
+                break
+            }
         }
 
-        if (Test-Path 'Profile') {
-            Remove-FslMultiOst -Path $mount.Path
+        try {
+            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $sizeMax = $partitionsize.SizeMax
+        }
+        catch {
+            $output.DiskState = 'NoPartitionInfo'
+            Write-Output $output
+            break
         }
 
+        if ($partitionsize.SizeMin / $sizeMax -gt $RatioFreeSpace ) {
+            try {
+                Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+            }
+            catch {
+                $output.DiskState = "PartitionShrinkFail"
+                Write-Output $output
+                break
+            }
+            finally {
+                $mount | DisMount-FslDisk
+            }
 
-        $mount | Dismount-FslDisk
+        }
+        else {
+            $output.DiskState = "LessThan$(100*$RatioFreeSpace)%InsideDisk"
+            Write-Output $output
+            $mount | DisMount-FslDisk
+            break
+        }
+
+        try {
+            #This is the only command we need from the Hyper-V module
+            Resize-VHD $Disk.FullName -ToMinimumSize -ErrorAction Stop -Passthru
+            $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+        }
+        catch {
+            $output.DiskState = "DiskShrinkFailed"
+            Write-Output $output
+            break
+        }
+
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $output.DiskState = "Success"
+            Write-Output $output
+        }
+        catch {
+            $output.DiskState = "FailedPartitionExpand"
+            Write-Output $output
+            break
+        }
+        finally {
+            $mount | DisMount-FslDisk
+        }
 
 
 

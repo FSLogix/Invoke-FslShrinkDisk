@@ -38,7 +38,7 @@ function Invoke-FslShrinkDisk {
 
     BEGIN {
         Set-StrictMode -Version Latest
-        #requires -Module Hyper-V
+        #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
         #Write-Log
         . Functions\Private\Write-Log.ps1
@@ -71,15 +71,11 @@ function Invoke-FslShrinkDisk {
 
         #Get a list of Virtual Hard Disk files depending on the recurse parameter
         if ($Recurse) {
-            $listing = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
+            $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
         }
         else {
-            $listing = Get-ChildItem -File -Filter *.vhd* -Path $Path
+            $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
         }
-
-        #filtering twice as the above filter would alse give use jim.vhd.txt as a result to process. unlikely, but might be worth it
-        #MaybeDo speed this up/remove second check
-        $diskList = $listing | Where-Object { $_.extension -in ".vhd", ".vhdx" }
 
         #If we can't find and files with the extension vhd or vhdx quit
         if ( ($diskList | Measure-Object).count -eq 0 ) {

@@ -22,7 +22,7 @@ function Remove-FslMultiOst {
         }
 
         #Write-Log  "Getting ost files from $Path"
-        $ost = Get-ChildItem -Path (Join-Path $Path *.ost)
+        $ost = Get-ChildItem -Path (Join-Path $Path *.ost) -File
         if ($null -eq $ost) {
             Write-Warning "Did not find any ost files in $Path"
             break
@@ -51,8 +51,8 @@ function Remove-FslMultiOst {
                 catch {
                     Write-Warning "Did not delete the orphaned ost file(s)"
                 }
-                
-                
+
+
             }
         }
     } #Process
