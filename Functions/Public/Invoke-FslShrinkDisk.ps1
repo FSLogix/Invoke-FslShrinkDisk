@@ -39,6 +39,7 @@ function Invoke-FslShrinkDisk {
     BEGIN {
         Set-StrictMode -Version Latest
         #requires -Module Hyper-V
+        #Requires -RunAsAdministrator
         #Write-Log
         . Functions\Private\Write-Log.ps1
         #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
@@ -61,37 +62,38 @@ function Invoke-FslShrinkDisk {
 
     } # Begin
     PROCESS {
-        
+
         #Check that the path is valid
         if (-not (Test-Path $Path)) {
             Write-Error "$Path not found"
-            exit
+            break
         }
 
         #Get a list of Virtual Hard Disk files depending on the recurse parameter
         if ($Recurse) {
-            $listing = Get-ChildItem $Path -Recurse 
+            $listing = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
         }
         else {
-            $listing = Get-ChildItem $Path
+            $listing = Get-ChildItem -File -Filter *.vhd* -Path $Path
         }
 
+        #filtering twice as the above filter would alse give use jim.vhd.txt as a result to process. unlikely, but might be worth it
+        #MaybeDo speed this up/remove second check
         $diskList = $listing | Where-Object { $_.extension -in ".vhd", ".vhdx" }
-        
+
         #If we can't find and files with the extension vhd or vhdx quit
         if ( ($diskList | Measure-Object).count -eq 0 ) {
             Write-Warning "No files to process in $Path"
-            exit
+            break
         }
-
 
         $scriptblock = {
 
-            
+
         } #Scriptblock
 
         $diskList | Invoke-Parallel -ScriptBlock $scriptblock -Throttle $usableThreads -ImportFunctions -ImportVariables -ImportModules
 
     } #Process
-    END {} #End
+    END { } #End
 }  #function Invoke-FslShrinkDisk
