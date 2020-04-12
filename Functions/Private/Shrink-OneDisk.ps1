@@ -50,9 +50,10 @@ function Shrink-OneDisk {
             FullName       = $Disk.FullName
         }
 
-        if ($Disk.Extension -ne 'vhd' -or $Disk.Extension -ne 'vhdx' ) {
-            $output.DiskState = 'NotDisk'
+        if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
+            $output.DiskState = 'FileIsNotDiskFormat'
             Write-Output $output
+            break
         }
 
 
@@ -65,7 +66,7 @@ function Shrink-OneDisk {
                     $output.SpaceSavedGB = $originalSizeGB - $output.FinalSizeGB
                 }
                 catch {
-                    $output.DiskState = 'DeletionFailed'
+                    $output.DiskState = 'DiskDeletionFailed'
                     Write-Output $output
                 }
                 break
@@ -111,12 +112,12 @@ function Shrink-OneDisk {
             break
         }
 
-        if ($partitionsize.SizeMin / $sizeMax -gt $RatioFreeSpace ) {
+        if ($partitionsize.SizeMin / $sizeMax -lt $RatioFreeSpace ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
             }
             catch {
-                $output.DiskState = "PartitionShrinkFail"
+                $output.DiskState = "PartitionShrinkFailed"
                 Write-Output $output
                 break
             }
@@ -134,7 +135,7 @@ function Shrink-OneDisk {
 
         try {
             #This is the only command we need from the Hyper-V module
-            Resize-VHD $Disk.FullName -ToMinimumSize -ErrorAction Stop -Passthru
+            Optimize-VHD -Path $Disk.FullName -Mode Full
             $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
         }
         catch {
@@ -147,23 +148,18 @@ function Shrink-OneDisk {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
             Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
             $output.DiskState = "Success"
+            $output.FinalSizeGB = $finalSize/1GB
+            $output.SpaceSavedGB = $originalSizeGB - $output.FinalSizeGB
             Write-Output $output
         }
         catch {
-            $output.DiskState = "FailedPartitionExpand"
+            $output.DiskState = "PartitionExpandFailed"
             Write-Output $output
             break
         }
         finally {
             $mount | DisMount-FslDisk
         }
-
-
-
-
-
-
-
     } #Process
     END { } #End
 }  #function Shrink-OneDisk
