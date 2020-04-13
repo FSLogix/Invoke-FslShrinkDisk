@@ -48,7 +48,8 @@ function Shrink-OneDisk {
         Set-StrictMode -Version Latest
     } # Begin
     PROCESS {
-        $originalSizeGB = [math]::Round($Disk.Length/1GB, 2)
+        #Grab size of disk being porcessed
+        $originalSizeGB = [math]::Round( $Disk.Length/1GB, 2 )
 
         $PSDefaultParameterValues = @{"Write-VhdOutput:Path" = $LogFilePath }
         $PSDefaultParameterValues = @{"Write-VhdOutput:Name" = $Disk.Name }
@@ -58,12 +59,13 @@ function Shrink-OneDisk {
         $PSDefaultParameterValues = @{"Write-VhdOutput:FullName" = $Disk.FullName }
         $PSDefaultParameterValues = @{"Write-VhdOutput:Passthru" = $Passthru }
 
+        #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
             Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
             break
         }
 
-
+        #If it's older than x days delete disk
         If ( $DeleteOlderThanDays ) {
             if ($Disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
@@ -77,11 +79,13 @@ function Shrink-OneDisk {
             }
         }
 
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
         if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
             Write-VhdOutput -DiskState 'Ignored'
             break
         }
 
+        #Initial disk Mount
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
         }
@@ -90,20 +94,7 @@ function Shrink-OneDisk {
             break
         }
 
-        #Check for orphaned ost files inside disks
-        $profileDiskOstPath = Join-Path $mount.Path 'Profile\AppData\Local\Microsoft\Outlook'
-        $officeDiskOstPath = Join-Path $mount.Path 'ODFC\Outlook'
-        switch ($true) {
-            { Test-Path $profileDiskOstPath } {
-                Remove-FslMultiOst $profileDiskOstPath
-                break
-            }
-            { Test-Path $officeDiskOstPath } {
-                Remove-FslMultiOst $profileDiskOstPath
-                break
-            }
-        }
-
+        #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
             $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
             $sizeMax = $partitionsize.SizeMax
@@ -113,6 +104,7 @@ function Shrink-OneDisk {
             break
         }
 
+        #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
         if ($partitionsize.SizeMin / $sizeMax -lt $RatioFreeSpace ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
@@ -132,6 +124,7 @@ function Shrink-OneDisk {
             break
         }
 
+        #Change the disk size
         try {
             #This is the only command we need from the Hyper-V module
             Optimize-VHD -Path $Disk.FullName -Mode Full
@@ -142,10 +135,11 @@ function Shrink-OneDisk {
             break
         }
 
+        #Now we need to reinflate the partition to its previous size
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
             Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
-            $finalSizeGB = [math]::Round($finalSize/1GB, 2)
+            $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
             Write-VhdOutput -DiskState "Success" -FinalSizeGB $finalSizeGB -SpaceSavedGB $originalSizeGB - $finalSizeGB
         }
         catch {
