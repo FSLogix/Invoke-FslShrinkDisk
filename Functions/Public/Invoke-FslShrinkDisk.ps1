@@ -84,7 +84,12 @@ function Invoke-FslShrinkDisk {
             Param ( $disk )
 
             $paramShrinkOneDisk = @{
-
+                Disk                = $disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                PassThru            = $PassThru
+                RatioFreeSpace      = 0.2
             }
             Shrink-OneDisk @paramShrinkOneDisk
 
