@@ -33,7 +33,7 @@ function Shrink-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [string]$LogFilePath = "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH:mm:ss).log",
+        [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH:mm:ss).csv",
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
