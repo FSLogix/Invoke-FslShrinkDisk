@@ -1,0 +1,2 @@
+"Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
+"3.22","Success","$originalSizeGB","3.22","4.35","$Disk.FullName"

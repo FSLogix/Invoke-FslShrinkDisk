@@ -51,13 +51,17 @@ function Shrink-OneDisk {
         #Grab size of disk being porcessed
         $originalSizeGB = [math]::Round( $Disk.Length/1GB, 2 )
 
-        $PSDefaultParameterValues = @{"Write-VhdOutput:Path" = $LogFilePath }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:Name" = $Disk.Name }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:OriginalSizeGB" = $originalSizeGB }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:FinalSizeGB" = $originalSizeGB }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:SpaceSavedGB" = 0 }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:FullName" = $Disk.FullName }
-        $PSDefaultParameterValues = @{"Write-VhdOutput:Passthru" = $Passthru }
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below
+        $PSDefaultParameterValues = @{
+            "Write-VhdOutput:Path"           = $LogFilePath
+            "Write-VhdOutput:Name"           = $Disk.Name
+            "Write-VhdOutput:DiskState"      = $null
+            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
+            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
+            "Write-VhdOutput:SpaceSavedGB"   = 0
+            "Write-VhdOutput:FullName"       = $Disk.FullName
+            "Write-VhdOutput:Passthru"       = $Passthru
+        }
 
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
@@ -124,11 +128,12 @@ function Shrink-OneDisk {
             break
         }
 
-        #Change the disk size
+        #Change the disk size and grab it's size
         try {
             #This is the only command we need from the Hyper-V module
             Optimize-VHD -Path $Disk.FullName -Mode Full
             $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+            $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
         }
         catch {
             Write-VhdOutput -DiskState "DiskShrinkFailed"
@@ -139,8 +144,12 @@ function Shrink-OneDisk {
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
             Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
-            $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
-            Write-VhdOutput -DiskState "Success" -FinalSizeGB $finalSizeGB -SpaceSavedGB $originalSizeGB - $finalSizeGB
+            $paramWriteVhdOutput = @{
+                DiskState    = "Success"
+                FinalSizeGB  = $finalSizeGB
+                SpaceSavedGB = $originalSizeGB - $finalSizeGB
+            }
+            Write-VhdOutput @paramWriteVhdOutput
         }
         catch {
             Write-VhdOutput -DiskState "PartitionExpandFailed"
