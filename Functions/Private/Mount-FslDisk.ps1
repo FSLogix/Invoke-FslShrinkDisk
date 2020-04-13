@@ -54,7 +54,6 @@ function Mount-FslDisk {
         }
 
         try {
-
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
                 PartitionNumber = $PartitionNumber

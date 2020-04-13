@@ -28,10 +28,10 @@ function Invoke-FslShrinkDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [System.String]$LogFilePath,
+        [System.String]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true #ToDo
+            ValuefromPipelineByPropertyName = $true
         )]
         [switch]$PassThru
     )
@@ -40,21 +40,17 @@ function Invoke-FslShrinkDisk {
         Set-StrictMode -Version Latest
         #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
-        #Write-Log
-        . Functions\Private\Write-Log.ps1
+
         #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
         . Functions\Private\Invoke-Parallel.ps1
         #Mount-FslDisk
         . Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
         . Functions\Private\Dismount-FslDisk.ps1
-        #Remove Orphan Ost
-        . Functions\Private\Remove-FslMultiOst.ps1
-        #Scriptblock control function
-        . Functions\Private\scriptblock.ps1
-
-        #Set default log path for all future logging events, to save typing
-        $PSDefaultParameterValues = @{ "Write-Log:Path" = $LogFilePath }
+        #Shrink single disk
+        . Functions\Private\Shrink-OneDisk.ps1
+        #Write Output to file and optionally to pipeline
+        . Functions\Private\Write-VhdOutput.ps1
 
         #Grab number (n) of threads available from local machine and set number of threads to n-2 with a mimimum of 2 threads.
         $usableThreads = (Get-Ciminstance Win32_processor).ThreadCount - 2
@@ -85,6 +81,12 @@ function Invoke-FslShrinkDisk {
 
         $scriptblock = {
 
+            Param ( $disk )
+
+            $paramShrinkOneDisk = @{
+
+            }
+            Shrink-OneDisk @paramShrinkOneDisk
 
         } #Scriptblock
 
