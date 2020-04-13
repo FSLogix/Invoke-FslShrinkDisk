@@ -56,7 +56,7 @@ function Write-VhdOutput {
             FullName       = $FullName
         }
 
-        $output | Export-Csv -Path $Path -NoClobber
+        $output | Export-Csv -Path $Path -NoClobber -Append
 
         if ($Passthru) {
             Write-Output $output
