@@ -16,43 +16,50 @@ function Shrink-OneDisk {
         [Int]$DeleteOlderThanDays,
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true
+            ValuefromPipelineByPropertyName = $true
         )]
         [Int]$IgnoreLessThanGB,
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true
+            ValuefromPipelineByPropertyName = $true
         )]
         [double]$RatioFreeSpace = 0.2,
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true
+            ValuefromPipelineByPropertyName = $true
         )]
-        [double]$PartitionNumber = 1
+        [int]$PartitionNumber = 1,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [string]$LogFilePath = "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH:mm:ss).log",
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [switch]$Passthru
+
     )
 
     BEGIN {
-        Set-StrictMode -Version Latest
         #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
+        Set-StrictMode -Version Latest
     } # Begin
     PROCESS {
-        $originalSizeGB = $Disk.Length/1GB
-        $output = [PSCustomObject]@{
-            Name           = $Disk.Name
-            DiskState      = $null
-            OriginalSizeGB = $originalSizeGB
-            FinalSizeGB    = $originalSizeGB
-            SpaceSavedGB   = 0
-            FullName       = $Disk.FullName
-        }
+        $originalSizeGB = [math]::Round($Disk.Length/1GB, 2)
+
+        $PSDefaultParameterValues = @{"Write-VhdOutput:Path" = $LogFilePath }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:Name" = $Disk.Name }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:OriginalSizeGB" = $originalSizeGB }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:FinalSizeGB" = $originalSizeGB }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:SpaceSavedGB" = 0 }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:FullName" = $Disk.FullName }
+        $PSDefaultParameterValues = @{"Write-VhdOutput:Passthru" = $Passthru }
 
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-            $output.DiskState = 'FileIsNotDiskFormat'
-            Write-Output $output
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
             break
         }
 
@@ -61,21 +68,17 @@ function Shrink-OneDisk {
             if ($Disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    $output.DiskState = 'Deleted'
-                    $output.FinalSizeGB = 0
-                    $output.SpaceSavedGB = $originalSizeGB - $output.FinalSizeGB
+                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
                 }
                 catch {
-                    $output.DiskState = 'DiskDeletionFailed'
-                    Write-Output $output
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
                 }
                 break
             }
         }
 
         if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-            $output.DiskState = 'Ignored'
-            Write-Output $output
+            Write-VhdOutput -DiskState 'Ignored'
             break
         }
 
@@ -83,8 +86,7 @@ function Shrink-OneDisk {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
         }
         catch {
-            $output.DiskState = 'DiskLocked'
-            Write-Output $output
+            Write-VhdOutput -DiskState 'DiskLocked'
             break
         }
 
@@ -107,8 +109,7 @@ function Shrink-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            $output.DiskState = 'NoPartitionInfo'
-            Write-Output $output
+            Write-VhdOutput -DiskState 'NoPartitionInfo'
             break
         }
 
@@ -117,8 +118,7 @@ function Shrink-OneDisk {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
             }
             catch {
-                $output.DiskState = "PartitionShrinkFailed"
-                Write-Output $output
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
                 break
             }
             finally {
@@ -127,8 +127,7 @@ function Shrink-OneDisk {
 
         }
         else {
-            $output.DiskState = "LessThan$(100*$RatioFreeSpace)%InsideDisk"
-            Write-Output $output
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%InsideDisk"
             $mount | DisMount-FslDisk
             break
         }
@@ -139,22 +138,18 @@ function Shrink-OneDisk {
             $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
         }
         catch {
-            $output.DiskState = "DiskShrinkFailed"
-            Write-Output $output
+            Write-VhdOutput -DiskState "DiskShrinkFailed"
             break
         }
 
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
             Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
-            $output.DiskState = "Success"
-            $output.FinalSizeGB = $finalSize/1GB
-            $output.SpaceSavedGB = $originalSizeGB - $output.FinalSizeGB
-            Write-Output $output
+            $finalSizeGB = [math]::Round($finalSize/1GB, 2)
+            Write-VhdOutput -DiskState "Success" -FinalSizeGB $finalSizeGB -SpaceSavedGB $originalSizeGB - $finalSizeGB
         }
         catch {
-            $output.DiskState = "PartitionExpandFailed"
-            Write-Output $output
+            Write-VhdOutput -DiskState "PartitionExpandFailed"
             break
         }
         finally {
