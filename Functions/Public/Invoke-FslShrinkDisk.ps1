@@ -33,7 +33,12 @@ function Invoke-FslShrinkDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [switch]$PassThru
+        [switch]$PassThru,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [int]$ThrottleLimit
     )
 
     BEGIN {
@@ -53,8 +58,10 @@ function Invoke-FslShrinkDisk {
         . Functions\Private\Write-VhdOutput.ps1
 
         #Grab number (n) of threads available from local machine and set number of threads to n-2 with a mimimum of 2 threads.
-        $usableThreads = (Get-Ciminstance Win32_processor).ThreadCount - 2
-        If ($usableThreads -le 2) { $usableThreads = 2 }
+        if (-not $ThrottleLimit){
+            $ThrottleLimit = (Get-Ciminstance Win32_processor).ThreadCount - 2
+            If ($ThrottleLimit -le 2) { $ThrottleLimit = 2 }
+        }
 
     } # Begin
     PROCESS {
@@ -79,7 +86,7 @@ function Invoke-FslShrinkDisk {
             break
         }
 
-        $scriptblock = {
+        $scriptblockInvokeParallel = {
 
             Param ( $disk )
 
@@ -95,7 +102,39 @@ function Invoke-FslShrinkDisk {
 
         } #Scriptblock
 
-        $diskList | Invoke-Parallel -ScriptBlock $scriptblock -Throttle $usableThreads -ImportFunctions -ImportVariables -ImportModules
+        $scriptblockForEachObject = {
+
+            #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
+            . Functions\Private\Invoke-Parallel.ps1
+            #Mount-FslDisk
+            . Functions\Private\Mount-FslDisk.ps1
+            #Dismount-FslDisk
+            . Functions\Private\Dismount-FslDisk.ps1
+            #Shrink single disk
+            . Functions\Private\Shrink-OneDisk.ps1
+            #Write Output to file and optionally to pipeline
+            . Functions\Private\Write-VhdOutput.ps1
+
+            $paramShrinkOneDisk = @{
+                Disk                = $_
+                DeleteOlderThanDays = $using:DeleteOlderThanDays
+                IgnoreLessThanGB    = $using:IgnoreLessThanGB
+                LogFilePath         = $using:LogFilePath
+                PassThru            = $using:PassThru
+                RatioFreeSpace      = 0.2
+            }
+            Shrink-OneDisk @paramShrinkOneDisk
+
+        } #Scriptblock
+
+        if ($PSVersionTable.PSVersion -ge 7) {
+            $diskList | ForEach-Object -Parallel $scriptblockForEachObject -ThrottleLimit $ThrottleLimit
+        }
+        else {
+            $diskList | Invoke-Parallel -ScriptBlock $scriptblockInvokeParallel -Throttle $ThrottleLimit -ImportFunctions -ImportVariables -ImportModules
+        }
+
+
 
     } #Process
     END { } #End
