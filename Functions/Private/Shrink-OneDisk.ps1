@@ -108,7 +108,7 @@ function Shrink-OneDisk {
         }
 
         #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-        if ($partitionsize.SizeMin / $sizeMax -lt $RatioFreeSpace ) {
+        if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
                 $mount | DisMount-FslDisk
@@ -121,7 +121,7 @@ function Shrink-OneDisk {
 
         }
         else {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%InsideDisk"
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
             $mount | DisMount-FslDisk
             return
         }
@@ -151,7 +151,7 @@ function Shrink-OneDisk {
             Write-VhdOutput @paramWriteVhdOutput
         }
         catch {
-            Write-VhdOutput -DiskState "PartitionExpandFailed"
+            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
             return
         }
         finally {
