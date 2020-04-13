@@ -1,0 +1,191 @@
+<Objs Version="1.1.0.1" 
+  xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>System.IO.FileInfo</T>
+      <T>System.IO.FileSystemInfo</T>
+      <T>System.MarshalByRefObject</T>
+      <T>System.Object</T>
+    </TN>
+    <ToString>TestDrive:\Profile_fslogix.VHDX</ToString>
+    <Props>
+      <I64 N="Length">4668260352</I64>
+      <S N="DirectoryName">TestDrive:</S>
+      <Obj N="Directory" RefId="1">
+        <TN RefId="1">
+          <T>System.IO.DirectoryInfo</T>
+          <T>System.IO.FileSystemInfo</T>
+          <T>System.MarshalByRefObject</T>
+          <T>System.Object</T>
+        </TN>
+        <ToString>TestDrive:</ToString>
+        <Props>
+          <S N="Parent">D:\JimM\TestVHDX</S>
+          <S N="Root">D:\</S>
+          <S N="FullName">TestDrive:</S>
+          <S N="Extension"></S>
+          <S N="Name">original</S>
+          <B N="Exists">true</B>
+          <DT N="CreationTime">2020-04-09T20:17:34.6768524+01:00</DT>
+          <DT N="CreationTimeUtc">2020-04-09T19:17:34.6768524Z</DT>
+          <DT N="LastAccessTime">2020-04-09T20:17:40.1478518+01:00</DT>
+          <DT N="LastAccessTimeUtc">2020-04-09T19:17:40.1478518Z</DT>
+          <DT N="LastWriteTime">2020-04-09T20:17:40.1478518+01:00</DT>
+          <DT N="LastWriteTimeUtc">2020-04-09T19:17:40.1478518Z</DT>
+          <S N="Attributes">Directory</S>
+        </Props>
+        <MS>
+          <S N="Mode">d----</S>
+          <S N="ModeWithoutHardLink">d----</S>
+          <S N="BaseName">original</S>
+          <Nil N="Target" />
+          <Nil N="LinkType" />
+          <S N="NameString">original</S>
+          <S N="LengthString"></S>
+          <S N="LastWriteTimeString">09/04/2020    20:17</S>
+        </MS>
+      </Obj>
+      <B N="IsReadOnly">false</B>
+      <S N="FullName">TestDrive:\Profile_fslogix.VHDX</S>
+      <S N="Extension">.VHDX</S>
+      <S N="Name">Profile_fslogix.VHDX</S>
+      <B N="Exists">true</B>
+      <DT N="CreationTime">2020-04-09T20:17:40.1438538+01:00</DT>
+      <DT N="CreationTimeUtc">2020-04-09T19:17:40.1438538Z</DT>
+      <DT N="LastAccessTime">2020-04-09T20:17:51.5888537+01:00</DT>
+      <DT N="LastAccessTimeUtc">2020-04-09T19:17:51.5888537Z</DT>
+      <DT N="LastWriteTime">2020-04-09T20:16:45.1142332+01:00</DT>
+      <DT N="LastWriteTimeUtc">2020-04-09T19:16:45.1142332Z</DT>
+      <Obj N="Attributes" RefId="2">
+        <TN RefId="2">
+          <T>System.IO.FileAttributes</T>
+          <T>System.Enum</T>
+          <T>System.ValueType</T>
+          <T>System.Object</T>
+        </TN>
+        <ToString>Archive</ToString>
+        <I32>32</I32>
+      </Obj>
+    </Props>
+    <MS>
+      <S N="PSPath">Microsoft.PowerShell.Core\FileSystem::TestDrive:\Profile_fslogix.VHDX</S>
+      <S N="PSParentPath">Microsoft.PowerShell.Core\FileSystem::TestDrive:</S>
+      <S N="PSChildName">Profile_fslogix.VHDX</S>
+      <Obj N="PSDrive" RefId="3">
+        <TN RefId="3">
+          <T>System.Management.Automation.PSDriveInfo</T>
+          <T>System.Object</T>
+        </TN>
+        <ToString>D</ToString>
+        <Props>
+          <S N="CurrentLocation"></S>
+          <S N="Name">D</S>
+          <Obj N="Provider" RefId="4">
+            <TN RefId="4">
+              <T>System.Management.Automation.ProviderInfo</T>
+              <T>System.Object</T>
+            </TN>
+            <ToString>Microsoft.PowerShell.Core\FileSystem</ToString>
+            <Props>
+              <S N="ImplementingType">Microsoft.PowerShell.Commands.FileSystemProvider</S>
+              <S N="HelpFile">System.Management.Automation.dll-Help.xml</S>
+              <S N="Name">FileSystem</S>
+              <S N="PSSnapIn">Microsoft.PowerShell.Core</S>
+              <S N="ModuleName">Microsoft.PowerShell.Core</S>
+              <Nil N="Module" />
+              <S N="Description"></S>
+              <S N="Capabilities">Filter, ShouldProcess, Credentials</S>
+              <S N="Home">C:\Users\jsmoy</S>
+              <Obj N="Drives" RefId="5">
+                <TN RefId="5">
+                  <T>System.Collections.ObjectModel.Collection`1[[System.Management.Automation.PSDriveInfo, System.Management.Automation, Version=7.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]</T>
+                  <T>System.Object</T>
+                </TN>
+                <LST>
+                  <S>C</S>
+                  <Ref RefId="3" />
+                  <S>E</S>
+                  <S>F</S>
+                  <S>Temp</S>
+                </LST>
+              </Obj>
+              <B N="VolumeSeparatedByColon">true</B>
+              <C N="ItemSeparator">92</C>
+              <C N="AltItemSeparator">47</C>
+            </Props>
+          </Obj>
+          <S N="Root">D:\</S>
+          <S N="Description">EVO</S>
+          <Nil N="MaximumSize" />
+          <Obj N="Credential" RefId="6">
+            <TN RefId="6">
+              <T>System.Management.Automation.PSCredential</T>
+              <T>System.Object</T>
+            </TN>
+            <ToString>System.Management.Automation.PSCredential</ToString>
+            <Props>
+              <Nil N="UserName" />
+              <Nil N="Password" />
+            </Props>
+          </Obj>
+          <Nil N="DisplayRoot" />
+          <B N="VolumeSeparatedByColon">true</B>
+        </Props>
+        <MS>
+          <I64 N="Used">370949623808</I64>
+          <I64 N="Free">129148774400</I64>
+        </MS>
+      </Obj>
+      <Ref N="PSProvider" RefId="4" />
+      <B N="PSIsContainer">false</B>
+      <S N="Mode">-a---</S>
+      <S N="ModeWithoutHardLink">-a---</S>
+      <Obj N="VersionInfo" RefId="7">
+        <TN RefId="7">
+          <T>System.Diagnostics.FileVersionInfo</T>
+          <T>System.Object</T>
+        </TN>
+        <ToString>File:             TestDrive:\Profile_fslogix.VHDX_x000D__x000A_InternalName:     _x000D__x000A_OriginalFilename: _x000D__x000A_FileVersion:      _x000D__x000A_FileDescription:  _x000D__x000A_Product:          _x000D__x000A_ProductVersion:   _x000D__x000A_Debug:            False_x000D__x000A_Patched:          False_x000D__x000A_PreRelease:       False_x000D__x000A_PrivateBuild:     False_x000D__x000A_SpecialBuild:     False_x000D__x000A_Language:         _x000D__x000A_</ToString>
+        <Props>
+          <Nil N="Comments" />
+          <Nil N="CompanyName" />
+          <I32 N="FileBuildPart">0</I32>
+          <Nil N="FileDescription" />
+          <I32 N="FileMajorPart">0</I32>
+          <I32 N="FileMinorPart">0</I32>
+          <S N="FileName">TestDrive:\Profile_fslogix.VHDX</S>
+          <I32 N="FilePrivatePart">0</I32>
+          <Nil N="FileVersion" />
+          <Nil N="InternalName" />
+          <B N="IsDebug">false</B>
+          <B N="IsPatched">false</B>
+          <B N="IsPrivateBuild">false</B>
+          <B N="IsPreRelease">false</B>
+          <B N="IsSpecialBuild">false</B>
+          <Nil N="Language" />
+          <Nil N="LegalCopyright" />
+          <Nil N="LegalTrademarks" />
+          <Nil N="OriginalFilename" />
+          <Nil N="PrivateBuild" />
+          <I32 N="ProductBuildPart">0</I32>
+          <I32 N="ProductMajorPart">0</I32>
+          <I32 N="ProductMinorPart">0</I32>
+          <Nil N="ProductName" />
+          <I32 N="ProductPrivatePart">0</I32>
+          <Nil N="ProductVersion" />
+          <Nil N="SpecialBuild" />
+        </Props>
+        <MS>
+          <Version N="FileVersionRaw">0.0.0.0</Version>
+          <Version N="ProductVersionRaw">0.0.0.0</Version>
+        </MS>
+      </Obj>
+      <S N="BaseName">Profile_fslogix</S>
+      <Nil N="Target" />
+      <Nil N="LinkType" />
+      <S N="NameString">Profile_fslogix.VHDX</S>
+      <S N="LengthString">4668260352</S>
+      <S N="LastWriteTimeString">09/04/2020    20:16</S>
+    </MS>
+  </Obj>
+</Objs>

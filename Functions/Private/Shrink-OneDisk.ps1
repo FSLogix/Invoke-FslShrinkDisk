@@ -10,8 +10,7 @@ function Shrink-OneDisk {
         [System.IO.FileInfo]$Disk,
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true
+            ValuefromPipelineByPropertyName = $true
         )]
         [Int]$DeleteOlderThanDays,
 
@@ -66,7 +65,7 @@ function Shrink-OneDisk {
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
             Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
-            break
+            return
         }
 
         #If it's older than x days delete disk
@@ -79,14 +78,14 @@ function Shrink-OneDisk {
                 catch {
                     Write-VhdOutput -DiskState 'DiskDeletionFailed'
                 }
-                break
+                return
             }
         }
 
         #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
         if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
             Write-VhdOutput -DiskState 'Ignored'
-            break
+            return
         }
 
         #Initial disk Mount
@@ -95,7 +94,7 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState 'DiskLocked'
-            break
+            return
         }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
@@ -105,39 +104,39 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState 'NoPartitionInfo'
-            break
+            return
         }
 
         #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
         if ($partitionsize.SizeMin / $sizeMax -lt $RatioFreeSpace ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                $mount | DisMount-FslDisk
             }
             catch {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed"
-                break
-            }
-            finally {
                 $mount | DisMount-FslDisk
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                return
             }
 
         }
         else {
             Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%InsideDisk"
             $mount | DisMount-FslDisk
-            break
+            return
         }
 
-        #Change the disk size and grab it's size
+        #Change the disk size and grab the new size
         try {
             #This is the only command we need from the Hyper-V module
-            Optimize-VHD -Path $Disk.FullName -Mode Full
+            Optimize-VHD -Path $Disk.FullName -Mode Full -ErrorAction Stop
+            #Resize-VHD -ToMinimumSize -Path $Disk.FullName -ErrorAction Stop
             $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
             $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
         }
         catch {
             Write-VhdOutput -DiskState "DiskShrinkFailed"
-            break
+            return
         }
 
         #Now we need to reinflate the partition to its previous size
@@ -153,7 +152,7 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState "PartitionExpandFailed"
-            break
+            return
         }
         finally {
             $mount | DisMount-FslDisk

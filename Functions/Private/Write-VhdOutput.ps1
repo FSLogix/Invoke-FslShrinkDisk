@@ -47,6 +47,7 @@ function Write-VhdOutput {
         Set-StrictMode -Version Latest
     } # Begin
     PROCESS {
+
         $output = [PSCustomObject]@{
             Name           = $Name
             DiskState      = $DiskState
@@ -56,11 +57,12 @@ function Write-VhdOutput {
             FullName       = $FullName
         }
 
-        $output | Export-Csv -Path $Path -NoClobber -Append
-
         if ($Passthru) {
             Write-Output $output
         }
+
+        $output | Export-Csv -Path $Path -NoClobber -Append
+
     } #Process
     END { } #End
 }  #function Write-VhdOutput.ps1
