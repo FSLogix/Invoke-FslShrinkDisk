@@ -42,7 +42,6 @@ function Shrink-OneDisk {
     )
 
     BEGIN {
-        #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
     } # Begin
@@ -128,15 +127,26 @@ function Shrink-OneDisk {
 
         #Change the disk size and grab the new size
         try {
-            #This is the only command we need from the Hyper-V module
-            Optimize-VHD -Path $Disk.FullName -Mode Full -ErrorAction Stop
-            #Resize-VHD -ToMinimumSize -Path $Disk.FullName -ErrorAction Stop
-            $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
-            $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
+            $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+            Set-Content -Path $tempFileName -Value "SELECT VDISK FILE=$($Disk.FullName)"
+            Add-Content -Path $tempFileName -Value 'COMPACT VDISK'
+            $diskPartResult = DISKPART /s $tempFileName
+            if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
+                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+                $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
+            }
+            else {
+                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name).txt" -Value $diskPartResult
+                Write-VhdOutput -DiskState "DiskShrinkFailed"
+                return
+            }
         }
         catch {
-            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Write-VhdOutput -DiskState "DiskPartFailed"
             return
+        }
+        finally {
+            Remove-Item $tempFileName -ErrorAction SilentlyContinue | Out-Null
         }
 
         #Now we need to reinflate the partition to its previous size

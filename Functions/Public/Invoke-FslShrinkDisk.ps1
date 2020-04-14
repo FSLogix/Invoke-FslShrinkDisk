@@ -43,7 +43,6 @@ function Invoke-FslShrinkDisk {
 
     BEGIN {
         Set-StrictMode -Version Latest
-        #Requires -Module Hyper-V
         #Requires -RunAsAdministrator
 
         #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
@@ -58,7 +57,7 @@ function Invoke-FslShrinkDisk {
         . Functions\Private\Write-VhdOutput.ps1
 
         #Grab number (n) of threads available from local machine and set number of threads to n-2 with a mimimum of 2 threads.
-        if (-not $ThrottleLimit){
+        if (-not $ThrottleLimit) {
             $ThrottleLimit = (Get-Ciminstance Win32_processor).ThreadCount - 2
             If ($ThrottleLimit -le 2) { $ThrottleLimit = 2 }
         }
