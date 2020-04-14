@@ -9,6 +9,11 @@ $here = $here | Split-Path -Parent | Split-Path -Parent
 . "$here\Functions\Private\Mount-FslDisk.ps1"
 . "$here\Functions\Private\Dismount-FslDisk.ps1"
 
+#Adding enpty function so that the mock works
+function invoke-diskpart ($Path) {
+
+}
+
 Describe "Describing $($sut.Trimend('.ps1'))" {
 
     $disk = New-Item testdrive:\fakedisk.vhdx | Get-ChildItem

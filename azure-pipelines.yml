@@ -1,0 +1,55 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  - master
+
+pool:
+  vmImage: "windows-2019"
+
+steps:
+  - task: PowerShell@2
+    displayName: "Install Newest Pester Version"
+    inputs:
+      targetType: "inline" # Optional. Options: filePath, inline
+      #filePath: # Required when targetType == FilePath
+      #arguments: # Optional
+      script: Install-Module -Name Pester -Force -SkipPublisherCheck
+      # Required when targetType == Inline
+      #errorActionPreference: 'stop' # Optional. Options: stop, continue, silentlyContinue
+      #failOnStderr: false # Optional
+      #ignoreLASTEXITCODE: false # Optional
+      #pwsh: false # Optional
+      #workingDirectory: # Optional
+
+  - task: PowerShell@2
+    displayName: "Run Pester Tests for Rules module"
+    inputs:
+      targetType: "inline" # Optional. Options: filePath, inline
+      #filePath: # Required when targetType == FilePath
+      #arguments: # Optional
+      script: Invoke-Pester -OutputFile PesterTest.xml -OutputFormat NUnitXml -CodeCoverage (Get-ChildItem .\functions -File -Recurse -Include *.ps1 | ? {$_.Name -ne 'Invoke-Parallel.ps1'}) -CodeCoverageOutputFile CodeCoverage.xml # Required when targetType == Inline
+      #errorActionPreference: 'stop' # Optional. Options: stop, continue, silentlyContinue
+      #failOnStderr: false # Optional
+      #ignoreLASTEXITCODE: false # Optional
+      #pwsh: false # Optional
+      #workingDirectory: # Optional
+
+  - task: PublishTestResults@2
+    inputs:
+      testRunTitle: "Pester Test Results"
+      buildPlatform: "Windows"
+      testRunner: "NUnit"
+      testResultsFiles: '.\PesterTest.xml'
+      mergeTestResults: false
+      failTaskOnFailedTests: true
+
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: "JaCoCo" # Options: cobertura, jaCoCo
+      summaryFileLocation: '.\CodeCoverage.xml'
+      #reportDirectory: # Optional
+      #additionalCodeCoverageFiles: # Optional
+      failIfCoverageEmpty: true # Optional

@@ -49,7 +49,7 @@ function Shrink-OneDisk {
         #Grab size of disk being porcessed
         $originalSizeGB = [math]::Round( $Disk.Length/1GB, 2 )
 
-        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
             "Write-VhdOutput:Path"           = $LogFilePath
             "Write-VhdOutput:Name"           = $Disk.Name
@@ -138,6 +138,11 @@ function Shrink-OneDisk {
 
             #Let's put diskpart into a function just so I can use Pester to Mock it
             function invoke-diskpart ($Path) {
+                #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
+                #A better way would be to use optimize-disk from the Hyper-V module,
+                #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
+                #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
                 Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
                 $result = DISKPART /s $Path
@@ -146,6 +151,7 @@ function Shrink-OneDisk {
 
             $diskPartResult = invoke-diskpart -Path $tempFileName
 
+            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
                 $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
@@ -155,6 +161,7 @@ function Shrink-OneDisk {
             else {
                 Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
                 $retries++
+                #if DiskPart fails, try, try again.
             }
             Start-Sleep 1
         }
