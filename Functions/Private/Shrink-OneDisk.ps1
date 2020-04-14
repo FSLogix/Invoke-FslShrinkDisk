@@ -139,7 +139,7 @@ function Shrink-OneDisk {
             #Let's put diskpart into a function just so I can use Pester to Mock it
             function invoke-diskpart ($Path) {
                 #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
-                #A better way would be to use optimize-disk from the Hyper-V module,
+                #A better way would be to use optimize-vhd from the Hyper-V module,
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
                 #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though

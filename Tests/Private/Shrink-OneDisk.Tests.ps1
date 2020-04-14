@@ -40,7 +40,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
     Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -ne $SizeMax }
     Mock -CommandName Resize-Partition -MockWith { $null }
     Mock -CommandName DisMount-FslDisk -MockWith { $null }
-    Mock -CommandName Optimize-VHD -MockWith { $null }
 
     Context "Input" {
 
