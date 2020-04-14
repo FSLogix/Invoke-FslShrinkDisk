@@ -110,7 +110,7 @@ function Shrink-OneDisk {
         if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
-                $mount | DisMount-FslDisk
+                $mount | DisMount-FslDisk -ErrorAction SilentlyContinue
             }
             catch {
                 $mount | DisMount-FslDisk
@@ -126,27 +126,31 @@ function Shrink-OneDisk {
         }
 
         #Change the disk size and grab the new size
-        try {
+        $retries = 0
+        $success = $false
+        while ($retries -lt 30 -and $success -ne $true) {
+
             $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
             Set-Content -Path $tempFileName -Value "SELECT VDISK FILE=$($Disk.FullName)"
             Add-Content -Path $tempFileName -Value 'COMPACT VDISK'
             $diskPartResult = DISKPART /s $tempFileName
+
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
                 $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
+                $success = $true
+                Remove-Item $tempFileName
             }
             else {
-                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name).txt" -Value $diskPartResult
-                Write-VhdOutput -DiskState "DiskShrinkFailed"
-                return
+                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
+                $retries++
             }
+            Start-Sleep 1
         }
-        catch {
-            Write-VhdOutput -DiskState "DiskPartFailed"
-            return
-        }
-        finally {
-            Remove-Item $tempFileName -ErrorAction SilentlyContinue | Out-Null
+
+        If ($success -ne $true) {
+            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Remove-Item $tempFileName
         }
 
         #Now we need to reinflate the partition to its previous size

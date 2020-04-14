@@ -60,8 +60,19 @@ function Write-VhdOutput {
         if ($Passthru) {
             Write-Output $output
         }
+        $success = $False
+        $retries = 0
+        while ($retries -lt 10 -and $success -ne $true) {
+            try{
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $success = $true
+            }
+            catch{
+                $retries++
+            }
+            Start-Sleep 1
+        }
 
-        $output | Export-Csv -Path $Path -NoClobber -Append
 
     } #Process
     END { } #End
