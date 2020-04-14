@@ -208,7 +208,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
 
     Context "Shrink Disk Fail" {
 
-        Mock -CommandName Optimize-VHD -MockWith { Write-Error 'nope' }
+        Mock -CommandName invoke-diskpart -MockWith { $null }
 
         $paramShrinkOneDisk = @{
             Disk                = $Disk
@@ -227,6 +227,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
     Context "Restore Partition size Fail" {
 
         Mock -CommandName Resize-Partition -MockWith { Write-Error 'nope' } -ParameterFilter { $Size -eq $SizeMax }
+        Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
 
         $paramShrinkOneDisk = @{
             Disk                = $Disk
@@ -244,6 +245,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
 
     Context "Output" {
         Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -eq $SizeMax }
+        Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
 
         $paramShrinkOneDisk = @{
             DeleteOlderThanDays = $DeleteOlderThanDays
@@ -253,7 +255,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when estore Partition size Fail" {
+        It "Gives right output when Shink Successful" {
             Shrink-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
@@ -262,7 +264,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Import-Csv 'TestDrive:\OutputTest.csv' | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
-        It "Saves Appends information in a csv" {
+        It "Appends information in a csv" {
             Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $Disk
             Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $NotDisk
             Import-Csv 'TestDrive:\AppendTest.csv' | Measure-Object | Select-Object -ExpandProperty Count | Should -Be 2

@@ -126,14 +126,25 @@ function Shrink-OneDisk {
         }
 
         #Change the disk size and grab the new size
+
+
+
         $retries = 0
         $success = $false
+        #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
         while ($retries -lt 30 -and $success -ne $true) {
 
             $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
-            Set-Content -Path $tempFileName -Value "SELECT VDISK FILE=$($Disk.FullName)"
-            Add-Content -Path $tempFileName -Value 'COMPACT VDISK'
-            $diskPartResult = DISKPART /s $tempFileName
+
+            #Let's put diskpart into a function just so I can use Pester to Mock it
+            function invoke-diskpart ($Path) {
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Add-Content -Path $Path -Value 'COMPACT VDISK'
+                $result = DISKPART /s $Path
+                Write-Output $result
+            }
+
+            $diskPartResult = invoke-diskpart -Path $tempFileName
 
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
@@ -151,6 +162,7 @@ function Shrink-OneDisk {
         If ($success -ne $true) {
             Write-VhdOutput -DiskState "DiskShrinkFailed"
             Remove-Item $tempFileName
+            return
         }
 
         #Now we need to reinflate the partition to its previous size
