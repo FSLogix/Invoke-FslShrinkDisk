@@ -84,7 +84,7 @@ function Invoke-FslShrinkDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [int]$ThrottleLimit
+        [int]$ThrottleLimit = 8
     )
 
     BEGIN {

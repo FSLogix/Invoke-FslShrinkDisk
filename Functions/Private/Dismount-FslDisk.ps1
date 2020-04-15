@@ -50,7 +50,7 @@ function Dismount-FslDisk {
         }
         catch {
             $junctionPointRemoved = $false
-            Write-Error "Failed to remove the junction point to $Path"
+            #Write-Error "Failed to remove the junction point to $Path"
         }
 
         try {

@@ -110,7 +110,7 @@ function Shrink-OneDisk {
         if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
-                $mount | DisMount-FslDisk -ErrorAction SilentlyContinue
+                $mount | DisMount-FslDisk
             }
             catch {
                 $mount | DisMount-FslDisk
