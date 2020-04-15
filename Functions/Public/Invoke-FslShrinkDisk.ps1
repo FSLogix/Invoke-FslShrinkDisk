@@ -1,6 +1,4 @@
-function Invoke-FslShrinkDisk {
-
-    <#
+<#
         .SYNOPSIS
         Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
 
@@ -18,6 +16,7 @@ function Invoke-FslShrinkDisk {
         Reducing the size of a virtual hard disk is a storage intensive activity.  The activity is more in file system metadata operations than pure IOPS, so make sure your storage controllers can handle the load.  The storage load occurs on the location where the disks are stored not on the machine where the script is run from.   I advise running the script out of hours if possible, to avoid impacting other users on the storage.
         With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.  By default the script will not run on any disk with less than 15% whitespace inside (configurable).  The script can optionally also not run on disks smaller than xGB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
         The script will output a csv in the following format:
+
         "Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
         "Profile_user1.vhdx","Success","4.35","3.22","1.13",\\Server\Share\ Profile_user1.vhdx "
         "Profile_user2.vhdx","Success","4.75","3.12","1.63",\\Server\Share\ Profile_user2.vhdx
@@ -72,7 +71,7 @@ function Invoke-FslShrinkDisk {
         The disk size in GB under which the script will not process the file.
 
         .PARAMETER RatioFreeSpace
-        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%
+        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.15
 
         .INPUTS
         You can pipe the path into the command which is recognised by type, you can also pipe any parameter by name. It will also take the path positionally
@@ -123,60 +122,86 @@ function Invoke-FslShrinkDisk {
 
     #>
 
-    [CmdletBinding()]
+[CmdletBinding()]
 
-    Param (
+Param (
 
-        [Parameter(
-            Position = 1,
-            ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true,
-            Mandatory = $true
-        )]
-        [System.String]$Path,
+    [Parameter(
+        Position = 1,
+        ValuefromPipelineByPropertyName = $true,
+        ValuefromPipeline = $true,
+        Mandatory = $true
+    )]
+    [System.String]$Path,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [double]$IgnoreLessThanGB = 0,
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [double]$IgnoreLessThanGB = 0,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [int]$DeleteOlderThanDays,
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [int]$DeleteOlderThanDays,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [Switch]$Recurse,
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [Switch]$Recurse,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [System.String]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [System.String]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [switch]$PassThru,
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [switch]$PassThru,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [int]$ThrottleLimit = 8,
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [int]$ThrottleLimit = 8,
 
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
-        [double]$RatioFreeSpace = 0.15
-    )
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [double]$RatioFreeSpace = 0.15
+)
 
-    BEGIN {
-        Set-StrictMode -Version Latest
-        #Requires -RunAsAdministrator
+BEGIN {
+    Set-StrictMode -Version Latest
+    #Requires -RunAsAdministrator
 
-        #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
-        . .\Functions\Private\Invoke-Parallel.ps1
+    #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
+    . .\Functions\Private\Invoke-Parallel.ps1
+
+} # Begin
+PROCESS {
+
+    #Check that the path is valid
+    if (-not (Test-Path $Path)) {
+        Write-Error "$Path not found"
+        return
+    }
+
+    #Get a list of Virtual Hard Disk files depending on the recurse parameter
+    if ($Recurse) {
+        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
+    }
+    else {
+        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
+    }
+
+    #If we can't find and files with the extension vhd or vhdx quit
+    if ( ($diskList | Measure-Object).count -eq 0 ) {
+        Write-Warning "No files to process in $Path"
+        return
+    }
+
+    $scriptblockForEachObject = {
+
         #Mount-FslDisk
         . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
@@ -186,83 +211,40 @@ function Invoke-FslShrinkDisk {
         #Write Output to file and optionally to pipeline
         . .\Functions\Private\Write-VhdOutput.ps1
 
-        #Grab number (n) of threads available from local machine and set number of threads to n-2 with a mimimum of 2 threads.
-        if (-not $ThrottleLimit) {
-            $ThrottleLimit = (Get-Ciminstance Win32_processor).ThreadCount - 2
-            If ($ThrottleLimit -le 2) { $ThrottleLimit = 2 }
+        $paramShrinkOneDisk = @{
+            Disk                = $_
+            DeleteOlderThanDays = $using:DeleteOlderThanDays
+            IgnoreLessThanGB    = $using:IgnoreLessThanGB
+            LogFilePath         = $using:LogFilePath
+            PassThru            = $using:PassThru
+            RatioFreeSpace      = $using:RatioFreeSpace
         }
+        Shrink-OneDisk @paramShrinkOneDisk
 
-    } # Begin
-    PROCESS {
+    } #Scriptblock
 
-        #Check that the path is valid
-        if (-not (Test-Path $Path)) {
-            Write-Error "$Path not found"
-            break
+    $scriptblockInvokeParallel = {
+
+        $disk = $_
+
+        $paramShrinkOneDisk = @{
+            Disk                = $disk
+            DeleteOlderThanDays = $DeleteOlderThanDays
+            IgnoreLessThanGB    = $IgnoreLessThanGB
+            LogFilePath         = $LogFilePath
+            PassThru            = $PassThru
+            RatioFreeSpace      = $RatioFreeSpace
         }
+        Shrink-OneDisk @paramShrinkOneDisk
 
-        #Get a list of Virtual Hard Disk files depending on the recurse parameter
-        if ($Recurse) {
-            $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
-        }
-        else {
-            $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
-        }
+    } #Scriptblock
 
-        #If we can't find and files with the extension vhd or vhdx quit
-        if ( ($diskList | Measure-Object).count -eq 0 ) {
-            Write-Warning "No files to process in $Path"
-            break
-        }
+    if ($PSVersionTable.PSVersion -ge [version]"7.0") {
+        $diskList | ForEach-Object -Parallel $scriptblockForEachObject -ThrottleLimit $ThrottleLimit
+    }
+    else {
+        $diskList | Invoke-Parallel -ScriptBlock $scriptblockInvokeParallel -Throttle $ThrottleLimit -ImportFunctions -ImportVariables -ImportModules
+    }
 
-        $scriptblockInvokeParallel = {
-
-            $disk = $_
-
-            $paramShrinkOneDisk = @{
-                Disk                = $disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                PassThru            = $PassThru
-                RatioFreeSpace      = $RatioFreeSpace
-            }
-            Shrink-OneDisk @paramShrinkOneDisk
-
-        } #Scriptblock
-
-        $scriptblockForEachObject = {
-
-            #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
-            . .\Functions\Private\Invoke-Parallel.ps1
-            #Mount-FslDisk
-            . .\Functions\Private\Mount-FslDisk.ps1
-            #Dismount-FslDisk
-            . .\Functions\Private\Dismount-FslDisk.ps1
-            #Shrink-OneDisk
-            . .\Functions\Private\Shrink-OneDisk.ps1
-            #Write Output to file and optionally to pipeline
-            . .\Functions\Private\Write-VhdOutput.ps1
-
-            $paramShrinkOneDisk = @{
-                Disk                = $_
-                DeleteOlderThanDays = $using:DeleteOlderThanDays
-                IgnoreLessThanGB    = $using:IgnoreLessThanGB
-                LogFilePath         = $using:LogFilePath
-                PassThru            = $using:PassThru
-                RatioFreeSpace      = $using:RatioFreeSpace
-            }
-            Shrink-OneDisk @paramShrinkOneDisk
-
-        } #Scriptblock
-
-        if ($PSVersionTable.PSVersion -ge [version]"7.0") {
-            $diskList | ForEach-Object -Parallel $scriptblockForEachObject -ThrottleLimit $ThrottleLimit
-        }
-        else {
-            $diskList | Invoke-Parallel -ScriptBlock $scriptblockInvokeParallel -Throttle $ThrottleLimit -ImportFunctions -ImportVariables -ImportModules
-        }
-
-    } #Process
-    END { } #End
-}  #function Invoke-FslShrinkDisk
+} #Process
+END { } #End

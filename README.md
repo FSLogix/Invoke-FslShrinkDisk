@@ -1,6 +1,6 @@
-[![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_apis/build/status/FSLogix.Invoke-FslShrinkDisk?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk.ps1/_apis/build/status/FSLogix.Invoke-FslShrinkDisk.ps1?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk.ps1/_build/latest?definitionId=1&branchName=master)
 
-# Invoke-FslShrinkDisk
+# Invoke-FslShrinkDisk.ps1
 
 ### .SYNOPSIS
 Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
@@ -92,27 +92,27 @@ You can pipe the path into the command which is recognised by type, you can also
 This script outputs a csv file with the result of the disk processing.  It will optionally produce a custom object with the same information
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path c:\Profile_user1.vhdx
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path c:\Profile_user1.vhdx
 This shrinks a single disk on the local file system
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse
 This shrinks all disks in the specified share recursively
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -IgnoreLessThanGB 3
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -IgnoreLessThanGB 3
 This shrinks all disks in the specified share recursively, except for files under 3GB in size which it ignores.
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -DeleteOlderThanDays 90
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -DeleteOlderThanDays 90
 This shrinks all disks in the specified share recursively and deletes disks which were not accessed within the last 90 days.
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
 This shrinks all disks in the specified share recursively and changes the default log file location to C:\MyLogFile.csv
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -PassThru
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru
 
     Name:			Profile_user1.vhdx
     DiskState:		Success
@@ -123,12 +123,12 @@ This shrinks all disks in the specified share recursively and changes the defaul
 This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object.
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -ThrottleLimit 20
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
 This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
 
 ### .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -RatioFreeSpace 0.3
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
 This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
 
 ### .LINK
-https://github.com/FSLogix/Invoke-FslShrinkDisk/
+https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/
