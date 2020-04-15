@@ -25,7 +25,7 @@ steps:
       #workingDirectory: # Optional
 
   - task: PowerShell@2
-    displayName: "Run Pester Tests for Rules module"
+    displayName: "Run Pester Tests for Script"
     inputs:
       targetType: "inline" # Optional. Options: filePath, inline
       #filePath: # Required when targetType == FilePath

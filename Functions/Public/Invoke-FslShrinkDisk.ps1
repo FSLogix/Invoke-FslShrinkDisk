@@ -1,4 +1,49 @@
 function Invoke-FslShrinkDisk {
+
+    <#
+        .SYNOPSIS
+        Shrinks FSLogix Profile or O365 dynamically expanding disk(s).
+
+        .DESCRIPTION
+        FSLogix profile and O365 virtual hard disks are in the vhd or vhdx format. By default the disks created will be in Dynamically Expanding format rather than Fixed.  This script does not support reducing the size of a Fixed file format.
+
+        Dynamically Expanding disks do not natively shrink when the volume of data within them reduces, they stay at the 'High water mark' of historical data volume within them.
+
+        THis means that Enterprises can wish to reclaim whitespace inside the disks to
+
+
+
+        .PARAMETER Name
+        Specifies the file name.
+
+        .PARAMETER Extension
+        Specifies the extension. "Txt" is the default.
+
+        .INPUTS
+        None. You cannot pipe objects to Add-Extension.
+
+        .OUTPUTS
+        System.String. Add-Extension returns a string with the extension or file name.
+
+        .EXAMPLE
+        C:\PS> extension -name "File"
+        File.txt
+
+        .EXAMPLE
+        C:\PS> extension -name "File" -extension "doc"
+        File.doc
+
+        .EXAMPLE
+        C:\PS> extension "File" "doc"
+        File.doc
+
+        .LINK
+        Online version: http://www.fabrikam.com/extension.html
+
+        .LINK
+        Set-Item
+    #>
+
     [CmdletBinding()]
 
     Param (
@@ -6,19 +51,20 @@ function Invoke-FslShrinkDisk {
         [Parameter(
             Position = 1,
             ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true
+            ValuefromPipeline = $true,
+            Mandatory = $true
         )]
         [System.String]$Path,
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [System.String]$IgnoreLessThanGB = 5,
+        [double]$IgnoreLessThanGB = 0,
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [System.String]$DeleteOlderThanDays,
+        [int]$DeleteOlderThanDays,
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
