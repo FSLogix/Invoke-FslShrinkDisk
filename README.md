@@ -52,13 +52,13 @@ The script will output a csv in the following format:
 
 If the diskstate shows an error value from the list above, manual intervention may be required to make the disk usable again.
 
-If you inspect your environment you will probably see that there are a few disks that are consuming a lot of capacity targeting these by using the minimum disk size configuration would be a good step.  To grab a list of disks and their sizes from a share you could use this oneliner by replacing <yourshare> with the path to the share containing the disks.
+If you inspect your environment you will probably see that there are a few disks that are consuming a lot of capacity targeting these by using the minimum disk size configuration would be a good step.  To grab a list of disks and their sizes from a share you could use this oneliner by replacing < yourshare > with the path to the share containing the disks.
 
     Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}}
 
-All this oneliner does is gather the names and sizes of the virtual hard disks from your share.  To export this information to a file readable by excel, use the following replacing both <yourshare> and < yourcsvfile.csv>.  You can then open the csv file in excel.
+All this oneliner does is gather the names and sizes of the virtual hard disks from your share.  To export this information to a file readable by excel, use the following replacing both < yourshare > and < yourcsvfile.csv >.  You can then open the csv file in excel.
 
-    Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv>
+    Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv >
 
 
 ### .NOTES
