@@ -14,10 +14,16 @@ This means that Enterprises can wish to reclaim whitespace inside the disks to k
 
 This Script is designed to work at Enterprise scale to reduce the size of thousands of disks in the shortest time possible.
 This script can be run from any machine in your environment it does not need to be run from a file server hosting the disks.  It does not need the Hyper-V role installed.
+
 Powershell version 5.x and 7 and above are supported for this script. It needs to be run as administrator due to the requirement for mounting disks to the OS where the script is run.
+
 This tool is multi-threaded and will take advantage of multiple CPU cores on the machine from which you run the script.  It is not advised to run more than 2x the threads of your available cores on your machine.  You could also use the number of threads to throttle the load on your storage.
+
 Reducing the size of a virtual hard disk is a storage intensive activity.  The activity is more in file system metadata operations than pure IOPS, so make sure your storage controllers can handle the load.  The storage load occurs on the location where the disks are stored not on the machine where the script is run from.   I advise running the script out of hours if possible, to avoid impacting other users on the storage.
-With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.  By default the script will not run on any disk with less than 15% whitespace inside (configurable).  The script can optionally also not run on disks smaller than xGB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
+
+With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.
+
+By default the script will not run on any disk with less than 15% whitespace inside (configurable).  The script can optionally also not run on disks smaller than (x)GB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
 The script will output a csv in the following format:
 
     "Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
@@ -120,7 +126,8 @@ This shrinks all disks in the specified share recursively and changes the defaul
     FinalSizeGB:		3.22
     SpaceSavedGB:		1.13
     FullName:		\\Server\Share\ Profile_user1.vhdx
-This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object.
+
+This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object as well as saving the results in a csv in the default location.
 
 ### .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
@@ -129,6 +136,10 @@ This shrinks all disks in the specified share recursively increasing the number 
 ### .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
 This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
+
+### .EXAMPLE
+    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru IgnoreLessThanGB 3 -DeleteOlderThanDays 90 -LogFilePath C:\MyLogFile.csv -ThrottleLimit 20 -RatioFreeSpace 0.3
+This does all of the above examples, but together.
 
 ### .LINK
 https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/
