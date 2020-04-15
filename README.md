@@ -25,19 +25,19 @@ The script will output a csv in the following format:
 "Profile_user2.vhdx","Success","4.75","3.12","1.63",\\Server\Share\ Profile_user2.vhdx
 
 Possible Information values for DiskState are as follows:
-Success				Disk has been successfully processed and shrunk
-Ignored				Disk was less than the size configured in -IgnoreLessThanGB parameter
-Deleted				Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted
-DiskLocked			Disk could not be mounted due to being in use
-LessThan(x)%FreeInsideDisk	Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing
+    Success				Disk has been successfully processed and shrunk
+    Ignored				Disk was less than the size configured in -IgnoreLessThanGB parameter
+    Deleted				Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted
+    DiskLocked			Disk could not be mounted due to being in use
+    LessThan(x)%FreeInsideDisk	Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing
 
 Possible Error values for DiskState are as follows:
-FileIsNotDiskFormat		Disk file extension was not vhd or vhdx
-DiskDeletionFailed		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted
-NoPartitionInfo			Could not get partition information for partition 1 from the disk
-PartitionShrinkFailed		Failed to Shrink partition as part of the disk processing
-DiskShrinkFailed		Could not shrink Disk
-PartitionSizeRestoreFailed 	Failed to Restore partition as part of the disk processing
+    FileIsNotDiskFormat		Disk file extension was not vhd or vhdx
+    DiskDeletionFailed		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted
+    NoPartitionInfo			Could not get partition information for partition 1 from the disk
+    PartitionShrinkFailed		Failed to Shrink partition as part of the disk processing
+    DiskShrinkFailed		Could not shrink Disk
+    PartitionSizeRestoreFailed 	Failed to Restore partition as part of the disk processing
 
 If the diskstate shows an error value from the list above, manual intervention may be required to make the disk usable again.
 
