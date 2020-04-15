@@ -67,7 +67,7 @@ function Dismount-FslDisk {
             $directoryRemoved = $true
         }
         catch {
-            Write-Error "Failed to delete temp mount directory $Path"
+            Write-Warning "Failed to delete temp mount directory $Path"
             $directoryRemoved = $false
         }
 

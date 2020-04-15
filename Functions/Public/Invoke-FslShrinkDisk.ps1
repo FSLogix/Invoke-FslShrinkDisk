@@ -45,7 +45,7 @@ function Invoke-FslShrinkDisk {
         Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv>
 
         .NOTES
-        Whilst I work for Microsoft and used to work for FSLogix, this is not officially released software from either company.  This is purely a personal project designed to help the community.  If you require suppport for this tool please raise an issue on the GitHub repository linked below
+        Whilst I work for Microsoft and used to work for FSLogix, this is not officially released software from either company.  This is purely a personal project designed to help the community.  If you require support for this tool please raise an issue on the GitHub repository linked below
 
         .PARAMETER Path
         The path to the folder/share containing the disks. You can also directly specify a single disk. UNC paths are supported.
@@ -176,15 +176,15 @@ function Invoke-FslShrinkDisk {
         #Requires -RunAsAdministrator
 
         #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
-        . Functions\Private\Invoke-Parallel.ps1
+        . .\Functions\Private\Invoke-Parallel.ps1
         #Mount-FslDisk
-        . Functions\Private\Mount-FslDisk.ps1
+        . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
-        . Functions\Private\Dismount-FslDisk.ps1
-        #Shrink single disk
-        . Functions\Private\Shrink-OneDisk.ps1
+        . .\Functions\Private\Dismount-FslDisk.ps1
+        #Shrink-OneDisk
+        . .\Functions\Private\Shrink-OneDisk.ps1
         #Write Output to file and optionally to pipeline
-        . Functions\Private\Write-VhdOutput.ps1
+        . .\Functions\Private\Write-VhdOutput.ps1
 
         #Grab number (n) of threads available from local machine and set number of threads to n-2 with a mimimum of 2 threads.
         if (-not $ThrottleLimit) {
@@ -217,7 +217,7 @@ function Invoke-FslShrinkDisk {
 
         $scriptblockInvokeParallel = {
 
-            Param ( $disk )
+            $disk = $_
 
             $paramShrinkOneDisk = @{
                 Disk                = $disk
@@ -234,15 +234,15 @@ function Invoke-FslShrinkDisk {
         $scriptblockForEachObject = {
 
             #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
-            . Functions\Private\Invoke-Parallel.ps1
+            . .\Functions\Private\Invoke-Parallel.ps1
             #Mount-FslDisk
-            . Functions\Private\Mount-FslDisk.ps1
+            . .\Functions\Private\Mount-FslDisk.ps1
             #Dismount-FslDisk
-            . Functions\Private\Dismount-FslDisk.ps1
-            #Shrink single disk
-            . Functions\Private\Shrink-OneDisk.ps1
+            . .\Functions\Private\Dismount-FslDisk.ps1
+            #Shrink-OneDisk
+            . .\Functions\Private\Shrink-OneDisk.ps1
             #Write Output to file and optionally to pipeline
-            . Functions\Private\Write-VhdOutput.ps1
+            . .\Functions\Private\Write-VhdOutput.ps1
 
             $paramShrinkOneDisk = @{
                 Disk                = $_
@@ -250,13 +250,13 @@ function Invoke-FslShrinkDisk {
                 IgnoreLessThanGB    = $using:IgnoreLessThanGB
                 LogFilePath         = $using:LogFilePath
                 PassThru            = $using:PassThru
-                RatioFreeSpace      = 0.2
+                RatioFreeSpace      = $using:RatioFreeSpace
             }
             Shrink-OneDisk @paramShrinkOneDisk
 
         } #Scriptblock
 
-        if ($PSVersionTable.PSVersion -ge 7) {
+        if ($PSVersionTable.PSVersion -ge [version]"7.0") {
             $diskList | ForEach-Object -Parallel $scriptblockForEachObject -ThrottleLimit $ThrottleLimit
         }
         else {
