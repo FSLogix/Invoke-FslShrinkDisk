@@ -20,31 +20,40 @@ Reducing the size of a virtual hard disk is a storage intensive activity.  The a
 With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.  By default the script will not run on any disk with less than 15% whitespace inside (configurable).  The script can optionally also not run on disks smaller than xGB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
 The script will output a csv in the following format:
 
-"Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
-"Profile_user1.vhdx","Success","4.35","3.22","1.13",\\Server\Share\ Profile_user1.vhdx "
-"Profile_user2.vhdx","Success","4.75","3.12","1.63",\\Server\Share\ Profile_user2.vhdx
+    "Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
+    "Profile_user1.vhdx","Success","4.35","3.22","1.13",\\Server\Share\ Profile_user1.vhdx "
+    "Profile_user2.vhdx","Success","4.75","3.12","1.63",\\Server\Share\ Profile_user2.vhdx
 
-Possible Information values for DiskState are as follows:
-    Success				Disk has been successfully processed and shrunk
-    Ignored				Disk was less than the size configured in -IgnoreLessThanGB parameter
-    Deleted				Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted
-    DiskLocked			Disk could not be mounted due to being in use
-    LessThan(x)%FreeInsideDisk	Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing
+#### Possible Information values for DiskState are as follows:
 
-Possible Error values for DiskState are as follows:
-    FileIsNotDiskFormat		Disk file extension was not vhd or vhdx
-    DiskDeletionFailed		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted
-    NoPartitionInfo			Could not get partition information for partition 1 from the disk
-    PartitionShrinkFailed		Failed to Shrink partition as part of the disk processing
-    DiskShrinkFailed		Could not shrink Disk
-    PartitionSizeRestoreFailed 	Failed to Restore partition as part of the disk processing
+| DiskState | Meaning |
+|-----|-----|
+| Success		|		Disk has been successfully processed and shrunk |
+| Ignored		|		Disk was less than the size configured in -IgnoreLessThanGB parameter |
+| Deleted		|		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted |
+| DiskLocked	|		Disk could not be mounted due to being in use |
+| LessThan(x)%FreeInsideDisk | Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
+
+#### Possible Error values for DiskState are as follows:
+| DiskState | Meaning |
+|-----|-----|
+| FileIsNotDiskFormat		| Disk file extension was not vhd or vhdx  |
+| DiskDeletionFailed		| Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted |
+| NoPartitionInfo			| Could not get partition information for partition 1 from the disk |
+| PartitionShrinkFailed		| Failed to Shrink partition as part of the disk processing |
+| DiskShrinkFailed		    | Could not shrink Disk |
+| PartitionSizeRestoreFailed |	Failed to Restore partition as part of the disk processing |
 
 If the diskstate shows an error value from the list above, manual intervention may be required to make the disk usable again.
 
 If you inspect your environment you will probably see that there are a few disks that are consuming a lot of capacity targeting these by using the minimum disk size configuration would be a good step.  To grab a list of disks and their sizes from a share you could use this oneliner by replacing <yourshare> with the path to the share containing the disks.
-Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}}
+
+    Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}}
+
 All this oneliner does is gather the names and sizes of the virtual hard disks from your share.  To export this information to a file readable by excel, use the following replacing both <yourshare> and < yourcsvfile.csv>.  You can then open the csv file in excel.
-Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv>
+
+    Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv>
+
 
 ### .NOTES
 Whilst I work for Microsoft and used to work for FSLogix, this is not officially released software from either company.  This is purely a personal project designed to help the community.  If you require support for this tool please raise an issue on the GitHub repository linked below
