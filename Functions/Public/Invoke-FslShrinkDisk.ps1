@@ -177,6 +177,18 @@ BEGIN {
     #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
     . .\Functions\Private\Invoke-Parallel.ps1
 
+    #Mount-FslDisk
+    . .\Functions\Private\Mount-FslDisk.ps1
+
+    #Dismount-FslDisk
+    . .\Functions\Private\Dismount-FslDisk.ps1
+
+    #Shrink-OneDisk
+    . .\Functions\Private\Shrink-OneDisk.ps1
+
+    #Write Output to file and optionally to pipeline
+    . .\Functions\Private\Write-VhdOutput.ps1
+
 } # Begin
 PROCESS {
 
@@ -202,6 +214,8 @@ PROCESS {
 
     $scriptblockForEachObject = {
 
+        #ForEach-Object -Parallel doesn't seem to want to import functions, so defining them twice, good job this is automated.
+
         #Mount-FslDisk
         . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
@@ -222,6 +236,11 @@ PROCESS {
         Shrink-OneDisk @paramShrinkOneDisk
 
     } #Scriptblock
+
+    #As I don't want ot define functions twice in the same script and foreach-object parallel can't import functions I'm going to have to do something a bit weird
+    #   executing the first scriptblock to load functions into memory without executing them with shrink-onedisk
+    $loadFuncs = $scriptblockForEachObject | Where-Object { $_ -notlike "*Shrink-OneDisk*" }
+    & { $loadFuncs }
 
     $scriptblockInvokeParallel = {
 
