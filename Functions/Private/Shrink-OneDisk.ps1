@@ -107,9 +107,18 @@ function Shrink-OneDisk {
         }
 
         #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-        if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
+
+
+        if ( $partitionsize.SizeMin -gt $disk.Length ) {
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            return
+        }
+
+
+        if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
             try {
                 Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Start-Sleep 1
                 $mount | DisMount-FslDisk
             }
             catch {

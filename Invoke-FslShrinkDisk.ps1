@@ -137,7 +137,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [double]$IgnoreLessThanGB = 3.5,
+    [double]$IgnoreLessThanGB = 0,
 
     [Parameter(
         ValuefromPipelineByPropertyName = $true
@@ -871,31 +871,52 @@ BEGIN {
             }
 
             # Reverse the three tasks from Mount-FslDisk
-            try {
-                Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
-                $junctionPointRemoved = $true
+            $junctionPointRemoved = $false
+            $timeStampPart = (Get-Date).AddSeconds(10)
+
+            while ((Get-Date) -lt $timeStampPart -and $junctionPointRemoved -ne $true) {
+                try {
+                    Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
+                    $junctionPointRemoved = $true
+                }
+                catch {
+                    $junctionPointRemoved = $false
+                }
             }
-            catch {
-                $junctionPointRemoved = $false
-                #Write-Error "Failed to remove the junction point to $Path"
+            if ($junctionPointRemoved -eq $false) {
+                Write-Warning "Failed to remove the junction point to $Path"
             }
 
-            try {
-                Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                $mountRemoved = $true
+            $mountRemoved = $false
+            $timeStampDismount = (Get-Date).AddSeconds(10)
+
+            while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
+                try {
+                    Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
+                    $mountRemoved = $true
+                }
+                catch {
+                    $mountRemoved = $false
+                }
             }
-            catch {
-                $mountRemoved = $false
+            if ($mountRemoved -eq $false) {
                 Write-Error "Failed to dismount disk $ImagePath"
             }
 
-            try {
-                Remove-Item -Path $Path -ErrorAction Stop | Out-Null
-                $directoryRemoved = $true
+            $directoryRemoved = $false
+            $timeStampDirectory = (Get-Date).AddSeconds(10)
+
+            while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
+                try {
+                    Remove-Item -Path $Path -ErrorAction Stop | Out-Null
+                    $directoryRemoved = $true
+                }
+                catch {
+                    $directoryRemoved = $false
+                }
             }
-            catch {
+            if (-not (Test-Path $Path)) {
                 Write-Warning "Failed to delete temp mount directory $Path"
-                $directoryRemoved = $false
             }
 
             If ($PassThru) {
@@ -906,7 +927,6 @@ BEGIN {
                 }
                 Write-Output $output
             }
-
             if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
                 Write-Verbose "Dismounted $ImagePath"
             }
@@ -1025,9 +1045,18 @@ BEGIN {
             }
 
             #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-            if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
+
+
+            if ( $partitionsize.SizeMin -gt $disk.Length ) {
+                Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+                return
+            }
+
+
+            if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
                 try {
                     Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                    Start-Sleep 1
                     $mount | DisMount-FslDisk
                 }
                 catch {
@@ -1356,31 +1385,52 @@ PROCESS {
                 }
 
                 # Reverse the three tasks from Mount-FslDisk
-                try {
-                    Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
-                    $junctionPointRemoved = $true
+                $junctionPointRemoved = $false
+                $timeStampPart = (Get-Date).AddSeconds(10)
+
+                while ((Get-Date) -lt $timeStampPart -and $junctionPointRemoved -ne $true) {
+                    try {
+                        Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
+                        $junctionPointRemoved = $true
+                    }
+                    catch {
+                        $junctionPointRemoved = $false
+                    }
                 }
-                catch {
-                    $junctionPointRemoved = $false
-                    #Write-Error "Failed to remove the junction point to $Path"
+                if ($junctionPointRemoved -eq $false) {
+                    Write-Warning "Failed to remove the junction point to $Path"
                 }
 
-                try {
-                    Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                    $mountRemoved = $true
+                $mountRemoved = $false
+                $timeStampDismount = (Get-Date).AddSeconds(10)
+
+                while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
+                    try {
+                        Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
+                        $mountRemoved = $true
+                    }
+                    catch {
+                        $mountRemoved = $false
+                    }
                 }
-                catch {
-                    $mountRemoved = $false
+                if ($mountRemoved -eq $false) {
                     Write-Error "Failed to dismount disk $ImagePath"
                 }
 
-                try {
-                    Remove-Item -Path $Path -ErrorAction Stop | Out-Null
-                    $directoryRemoved = $true
+                $directoryRemoved = $false
+                $timeStampDirectory = (Get-Date).AddSeconds(10)
+
+                while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
+                    try {
+                        Remove-Item -Path $Path -ErrorAction Stop | Out-Null
+                        $directoryRemoved = $true
+                    }
+                    catch {
+                        $directoryRemoved = $false
+                    }
                 }
-                catch {
+                if (-not (Test-Path $Path)) {
                     Write-Warning "Failed to delete temp mount directory $Path"
-                    $directoryRemoved = $false
                 }
 
                 If ($PassThru) {
@@ -1391,7 +1441,6 @@ PROCESS {
                     }
                     Write-Output $output
                 }
-
                 if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
                     Write-Verbose "Dismounted $ImagePath"
                 }
@@ -1509,9 +1558,18 @@ PROCESS {
                 }
 
                 #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-                if (($partitionsize.SizeMin / $sizeMax) -lt (1 - $RatioFreeSpace) ) {
+
+
+                if ( $partitionsize.SizeMin -gt $disk.Length ) {
+                    Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+                    return
+                }
+
+
+                if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
                     try {
                         Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                        Start-Sleep 1
                         $mount | DisMount-FslDisk
                     }
                     catch {
@@ -1687,11 +1745,6 @@ PROCESS {
         Shrink-OneDisk @paramShrinkOneDisk
 
     } #Scriptblock
-
-    #As I don't want ot define functions twice in the same script and foreach-object parallel can't import functions I'm going to have to do something a bit weird
-    #   executing the first scriptblock to load functions into memory without executing them with shrink-onedisk
-    $loadFuncs = $scriptblockForEachObject | Where-Object { $_ -notlike "*Shrink-OneDisk*" }
-    & { $loadFuncs }
 
     $scriptblockInvokeParallel = {
 

@@ -54,8 +54,10 @@ function Dismount-FslDisk {
             }
             catch {
                 $junctionPointRemoved = $false
-                Write-Warning "Failed to remove the junction point to $Path"
             }
+        }
+        if ($junctionPointRemoved -eq $false) {
+            Write-Warning "Failed to remove the junction point to $Path"
         }
 
         $mountRemoved = $false
@@ -68,8 +70,10 @@ function Dismount-FslDisk {
             }
             catch {
                 $mountRemoved = $false
-                Write-Error "Failed to dismount disk $ImagePath"
             }
+        }
+        if ($mountRemoved -eq $false) {
+            Write-Error "Failed to dismount disk $ImagePath"
         }
 
         $directoryRemoved = $false
@@ -81,9 +85,11 @@ function Dismount-FslDisk {
                 $directoryRemoved = $true
             }
             catch {
-                Write-Warning "Failed to delete temp mount directory $Path"
                 $directoryRemoved = $false
             }
+        }
+        if (Test-Path $Path) {
+            Write-Warning "Failed to delete temp mount directory $Path"
         }
 
         If ($PassThru) {
@@ -94,7 +100,6 @@ function Dismount-FslDisk {
             }
             Write-Output $output
         }
-
         if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
             Write-Verbose "Dismounted $ImagePath"
         }

@@ -188,7 +188,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when Shrink Partition Fail" {
+        It "Gives right output when Shrink Partition Fail" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionShrinkFailed'
         }
     }
@@ -204,7 +204,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when No Partition Space" {
+        It "Gives right output when No Partition Space" -Skip {
             $out = Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState
             $out | Should -Be LessThan$(100*$paramShrinkOneDisk.RatioFreeSpace)%FreeInsideDisk
         }
@@ -223,7 +223,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when Shrink Disk Fail" {
+        It "Gives right output when Shrink Disk Fail" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskShrinkFailed'
         }
     }
@@ -242,7 +242,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when estore Partition size Fail" {
+        It "Gives right output when estore Partition size Fail" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionSizeRestoreFailed'
         }
     }
@@ -259,16 +259,16 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             Partition           = 1
         }
 
-        It "Gives right output when Shink Successful" {
+        It "Gives right output when Shink Successful" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
-        It "Saves correct information in a csv" {
+        It "Saves correct information in a csv" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -Disk $Disk -ErrorAction Stop -LogFilePath 'TestDrive:\OutputTest.csv'
             Import-Csv 'TestDrive:\OutputTest.csv' | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
-        It "Appends information in a csv" {
+        It "Appends information in a csv" -Skip {
             Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $Disk
             Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $NotDisk
             Import-Csv 'TestDrive:\AppendTest.csv' | Measure-Object | Select-Object -ExpandProperty Count | Should -Be 2
