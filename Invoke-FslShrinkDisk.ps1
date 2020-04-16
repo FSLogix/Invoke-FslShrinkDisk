@@ -137,7 +137,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [double]$IgnoreLessThanGB = 0,
+    [double]$IgnoreLessThanGB = 3.5,
 
     [Parameter(
         ValuefromPipelineByPropertyName = $true

@@ -44,31 +44,46 @@ function Dismount-FslDisk {
         }
 
         # Reverse the three tasks from Mount-FslDisk
-        try {
-            Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
-            $junctionPointRemoved = $true
-        }
-        catch {
-            $junctionPointRemoved = $false
-            #Write-Error "Failed to remove the junction point to $Path"
+        $junctionPointRemoved = $false
+        $timeStampPart = (Get-Date).AddSeconds(10)
+
+        while ((Get-Date) -lt $timeStampPart -and $junctionPointRemoved -ne $true) {
+            try {
+                Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
+                $junctionPointRemoved = $true
+            }
+            catch {
+                $junctionPointRemoved = $false
+                Write-Warning "Failed to remove the junction point to $Path"
+            }
         }
 
-        try {
-            Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-            $mountRemoved = $true
-        }
-        catch {
-            $mountRemoved = $false
-            Write-Error "Failed to dismount disk $ImagePath"
+        $mountRemoved = $false
+        $timeStampDismount = (Get-Date).AddSeconds(10)
+
+        while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
+            try {
+                Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
+                $mountRemoved = $true
+            }
+            catch {
+                $mountRemoved = $false
+                Write-Error "Failed to dismount disk $ImagePath"
+            }
         }
 
-        try {
-            Remove-Item -Path $Path -ErrorAction Stop | Out-Null
-            $directoryRemoved = $true
-        }
-        catch {
-            Write-Warning "Failed to delete temp mount directory $Path"
-            $directoryRemoved = $false
+        $directoryRemoved = $false
+        $timeStampDirectory = (Get-Date).AddSeconds(10)
+
+        while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
+            try {
+                Remove-Item -Path $Path -ErrorAction Stop | Out-Null
+                $directoryRemoved = $true
+            }
+            catch {
+                Write-Warning "Failed to delete temp mount directory $Path"
+                $directoryRemoved = $false
+            }
         }
 
         If ($PassThru) {
