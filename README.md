@@ -1,4 +1,4 @@
-[![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk.ps1/_apis/build/status/FSLogix.Invoke-FslShrinkDisk.ps1?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk.ps1/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_apis/build/status/FSLogix.Invoke-FslShrinkDisk?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_build/latest?definitionId=1&branchName=master)
 
 # Invoke-FslShrinkDisk.ps1
 
