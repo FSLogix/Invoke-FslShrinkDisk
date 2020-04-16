@@ -237,11 +237,6 @@ PROCESS {
 
     } #Scriptblock
 
-    #As I don't want ot define functions twice in the same script and foreach-object parallel can't import functions I'm going to have to do something a bit weird
-    #   executing the first scriptblock to load functions into memory without executing them with shrink-onedisk
-    $loadFuncs = $scriptblockForEachObject | Where-Object { $_ -notlike "*Shrink-OneDisk*" }
-    & { $loadFuncs }
-
     $scriptblockInvokeParallel = {
 
         $disk = $_
