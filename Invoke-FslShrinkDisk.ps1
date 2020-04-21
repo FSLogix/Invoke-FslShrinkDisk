@@ -915,7 +915,7 @@ BEGIN {
                     $directoryRemoved = $false
                 }
             }
-            if (-not (Test-Path $Path)) {
+            if (Test-Path $Path) {
                 Write-Warning "Failed to delete temp mount directory $Path"
             }
 
@@ -1049,6 +1049,7 @@ BEGIN {
 
             if ( $partitionsize.SizeMin -gt $disk.Length ) {
                 Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+                $mount | DisMount-FslDisk
                 return
             }
 
@@ -1429,7 +1430,7 @@ PROCESS {
                         $directoryRemoved = $false
                     }
                 }
-                if (-not (Test-Path $Path)) {
+                if (Test-Path $Path) {
                     Write-Warning "Failed to delete temp mount directory $Path"
                 }
 
@@ -1562,6 +1563,7 @@ PROCESS {
 
                 if ( $partitionsize.SizeMin -gt $disk.Length ) {
                     Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+                    $mount | DisMount-FslDisk
                     return
                 }
 
@@ -1769,7 +1771,5 @@ PROCESS {
         $diskList | Invoke-Parallel -ScriptBlock $scriptblockInvokeParallel -Throttle $ThrottleLimit -ImportFunctions -ImportVariables -ImportModules
     }
 
-} #Process
-END { } #EndEND { } #End
 } #Process
 END { } #End
