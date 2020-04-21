@@ -47,7 +47,7 @@ function Shrink-OneDisk {
     } # Begin
     PROCESS {
         #Grab size of disk being porcessed
-        $originalSizeGB = [math]::Round( $Disk.Length/1GB, 2 )
+        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
 
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
@@ -111,6 +111,7 @@ function Shrink-OneDisk {
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
             Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            $mount | DisMount-FslDisk
             return
         }
 
@@ -163,7 +164,7 @@ function Shrink-OneDisk {
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
-                $finalSizeGB = [math]::Round( $finalSize/1GB, 2 )
+                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
             }
