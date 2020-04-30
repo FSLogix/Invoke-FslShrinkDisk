@@ -69,7 +69,7 @@ function Shrink-OneDisk {
 
         #If it's older than x days delete disk
         If ( $DeleteOlderThanDays ) {
-            #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent
+            #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent of access and write
             $mostRecent = $Disk.LastAccessTime, $Disk.LastWriteTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
