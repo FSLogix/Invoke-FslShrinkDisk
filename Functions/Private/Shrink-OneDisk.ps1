@@ -69,7 +69,9 @@ function Shrink-OneDisk {
 
         #If it's older than x days delete disk
         If ( $DeleteOlderThanDays ) {
-            if ($Disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
+            #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent
+            $mostRecent = $Disk.LastAccessTime, $Disk.LastWriteTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+            if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
                     Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB

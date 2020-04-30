@@ -81,7 +81,7 @@ function Dismount-FslDisk {
 
         while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
             try {
-                Remove-Item -Path $Path -ErrorAction Stop | Out-Null
+                Remove-Item -Path $Path -Force -ErrorAction Stop | Out-Null
                 $directoryRemoved = $true
             }
             catch {
