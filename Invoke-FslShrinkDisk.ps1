@@ -175,8 +175,8 @@ BEGIN {
     #Requires -RunAsAdministrator
 
     #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
-    function Invoke-Parallel {
-        <#
+function Invoke-Parallel {
+    <#
     .SYNOPSIS
         Function to control parallel processing using runspaces
 
@@ -325,903 +325,874 @@ BEGIN {
     .LINK
         https://github.com/RamblingCookieMonster/Invoke-Parallel
     #>
-        [cmdletbinding(DefaultParameterSetName = 'ScriptBlock')]
-        Param (
-            [Parameter(Mandatory = $false, position = 0, ParameterSetName = 'ScriptBlock')]
-            [System.Management.Automation.ScriptBlock]$ScriptBlock,
+    [cmdletbinding(DefaultParameterSetName = 'ScriptBlock')]
+    Param (
+        [Parameter(Mandatory = $false, position = 0, ParameterSetName = 'ScriptBlock')]
+        [System.Management.Automation.ScriptBlock]$ScriptBlock,
 
-            [Parameter(Mandatory = $false, ParameterSetName = 'ScriptFile')]
-            [ValidateScript( { Test-Path $_ -pathtype leaf })]
-            $ScriptFile,
+        [Parameter(Mandatory = $false, ParameterSetName = 'ScriptFile')]
+        [ValidateScript( { Test-Path $_ -pathtype leaf })]
+        $ScriptFile,
 
-            [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-            [Alias('CN', '__Server', 'IPAddress', 'Server', 'ComputerName')]
-            [PSObject]$InputObject,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Alias('CN', '__Server', 'IPAddress', 'Server', 'ComputerName')]
+        [PSObject]$InputObject,
 
-            [PSObject]$Parameter,
+        [PSObject]$Parameter,
 
-            [switch]$ImportVariables,
-            [switch]$ImportModules,
-            [switch]$ImportFunctions,
+        [switch]$ImportVariables,
+        [switch]$ImportModules,
+        [switch]$ImportFunctions,
 
-            [int]$Throttle = 20,
-            [int]$SleepTimer = 200,
-            [int]$RunspaceTimeout = 0,
-            [switch]$NoCloseOnTimeout = $false,
-            [int]$MaxQueue,
+        [int]$Throttle = 20,
+        [int]$SleepTimer = 200,
+        [int]$RunspaceTimeout = 0,
+        [switch]$NoCloseOnTimeout = $false,
+        [int]$MaxQueue,
 
-            [validatescript( { Test-Path (Split-Path $_ -parent) })]
-            [switch] $AppendLog = $false,
-            [string]$LogFile,
+        [validatescript( { Test-Path (Split-Path $_ -parent) })]
+        [switch] $AppendLog = $false,
+        [string]$LogFile,
 
-            [switch] $Quiet = $false
-        )
-        begin {
-            #No max queue specified?  Estimate one.
-            #We use the script scope to resolve an odd PowerShell 2 issue where MaxQueue isn't seen later in the function
-            if ( -not $PSBoundParameters.ContainsKey('MaxQueue') ) {
-                if ($RunspaceTimeout -ne 0) { $script:MaxQueue = $Throttle }
-                else { $script:MaxQueue = $Throttle * 3 }
-            }
-            else {
-                $script:MaxQueue = $MaxQueue
-            }
-            $ProgressId = Get-Random
-            Write-Verbose "Throttle: '$throttle' SleepTimer '$sleepTimer' runSpaceTimeout '$runspaceTimeout' maxQueue '$maxQueue' logFile '$logFile'"
+        [switch] $Quiet = $false
+    )
+    begin {
+        #No max queue specified?  Estimate one.
+        #We use the script scope to resolve an odd PowerShell 2 issue where MaxQueue isn't seen later in the function
+        if ( -not $PSBoundParameters.ContainsKey('MaxQueue') ) {
+            if ($RunspaceTimeout -ne 0) { $script:MaxQueue = $Throttle }
+            else { $script:MaxQueue = $Throttle * 3 }
+        }
+        else {
+            $script:MaxQueue = $MaxQueue
+        }
+        $ProgressId = Get-Random
+        Write-Verbose "Throttle: '$throttle' SleepTimer '$sleepTimer' runSpaceTimeout '$runspaceTimeout' maxQueue '$maxQueue' logFile '$logFile'"
 
-            #If they want to import variables or modules, create a clean runspace, get loaded items, use those to exclude items
-            if ($ImportVariables -or $ImportModules -or $ImportFunctions) {
-                $StandardUserEnv = [powershell]::Create().addscript( {
+        #If they want to import variables or modules, create a clean runspace, get loaded items, use those to exclude items
+        if ($ImportVariables -or $ImportModules -or $ImportFunctions) {
+            $StandardUserEnv = [powershell]::Create().addscript( {
 
-                        #Get modules, snapins, functions in this clean runspace
-                        $Modules = Get-Module | Select-Object -ExpandProperty Name
-                        $Snapins = Get-PSSnapin | Select-Object -ExpandProperty Name
-                        $Functions = Get-ChildItem function:\ | Select-Object -ExpandProperty Name
+                    #Get modules, snapins, functions in this clean runspace
+                    $Modules = Get-Module | Select-Object -ExpandProperty Name
+                    $Snapins = Get-PSSnapin | Select-Object -ExpandProperty Name
+                    $Functions = Get-ChildItem function:\ | Select-Object -ExpandProperty Name
 
-                        #Get variables in this clean runspace
-                        #Called last to get vars like $? into session
-                        $Variables = Get-Variable | Select-Object -ExpandProperty Name
+                    #Get variables in this clean runspace
+                    #Called last to get vars like $? into session
+                    $Variables = Get-Variable | Select-Object -ExpandProperty Name
 
-                        #Return a hashtable where we can access each.
-                        @{
-                            Variables = $Variables
-                            Modules   = $Modules
-                            Snapins   = $Snapins
-                            Functions = $Functions
-                        }
-                    }, $true).invoke()[0]
-
-                if ($ImportVariables) {
-                    #Exclude common parameters, bound parameters, and automatic variables
-                    Function _temp { [cmdletbinding(SupportsShouldProcess = $True)] param() }
-                    $VariablesToExclude = @( (Get-Command _temp | Select-Object -ExpandProperty parameters).Keys + $PSBoundParameters.Keys + $StandardUserEnv.Variables )
-                    Write-Verbose "Excluding variables $( ($VariablesToExclude | Sort-Object ) -join ", ")"
-
-                    # we don't use 'Get-Variable -Exclude', because it uses regexps.
-                    # One of the veriables that we pass is '$?'.
-                    # There could be other variables with such problems.
-                    # Scope 2 required if we move to a real module
-                    $UserVariables = @( Get-Variable | Where-Object { -not ($VariablesToExclude -contains $_.Name) } )
-                    Write-Verbose "Found variables to import: $( ($UserVariables | Select-Object -expandproperty Name | Sort-Object ) -join ", " | Out-String).`n"
-                }
-                if ($ImportModules) {
-                    $UserModules = @( Get-Module | Where-Object { $StandardUserEnv.Modules -notcontains $_.Name -and (Test-Path $_.Path -ErrorAction SilentlyContinue) } | Select-Object -ExpandProperty Path )
-                    $UserSnapins = @( Get-PSSnapin | Select-Object -ExpandProperty Name | Where-Object { $StandardUserEnv.Snapins -notcontains $_ } )
-                }
-                if ($ImportFunctions) {
-                    $UserFunctions = @( Get-ChildItem function:\ | Where-Object { $StandardUserEnv.Functions -notcontains $_.Name } )
-                }
-            }
-
-            #region functions
-            Function Get-RunspaceData {
-                [cmdletbinding()]
-                param( [switch]$Wait )
-                #loop through runspaces
-                #if $wait is specified, keep looping until all complete
-                Do {
-                    #set more to false for tracking completion
-                    $more = $false
-
-                    #Progress bar if we have inputobject count (bound parameter)
-                    if (-not $Quiet) {
-                        Write-Progress -Id $ProgressId -Activity "Running Query" -Status "Starting threads"`
-                            -CurrentOperation "$startedCount threads defined - $totalCount input objects - $script:completedCount input objects processed"`
-                            -PercentComplete $( Try { $script:completedCount / $totalCount * 100 } Catch { 0 } )
+                    #Return a hashtable where we can access each.
+                    @{
+                        Variables = $Variables
+                        Modules   = $Modules
+                        Snapins   = $Snapins
+                        Functions = $Functions
                     }
+                }, $true).invoke()[0]
 
-                    #run through each runspace.
-                    Foreach ($runspace in $runspaces) {
+            if ($ImportVariables) {
+                #Exclude common parameters, bound parameters, and automatic variables
+                Function _temp { [cmdletbinding(SupportsShouldProcess = $True)] param() }
+                $VariablesToExclude = @( (Get-Command _temp | Select-Object -ExpandProperty parameters).Keys + $PSBoundParameters.Keys + $StandardUserEnv.Variables )
+                Write-Verbose "Excluding variables $( ($VariablesToExclude | Sort-Object ) -join ", ")"
 
-                        #get the duration - inaccurate
-                        $currentdate = Get-Date
-                        $runtime = $currentdate - $runspace.startTime
-                        $runMin = [math]::Round( $runtime.totalminutes , 2 )
-
-                        #set up log object
-                        $log = "" | Select-Object Date, Action, Runtime, Status, Details
-                        $log.Action = "Removing:'$($runspace.object)'"
-                        $log.Date = $currentdate
-                        $log.Runtime = "$runMin minutes"
-
-                        #If runspace completed, end invoke, dispose, recycle, counter++
-                        If ($runspace.Runspace.isCompleted) {
-
-                            $script:completedCount++
-
-                            #check if there were errors
-                            if ($runspace.powershell.Streams.Error.Count -gt 0) {
-                                #set the logging info and move the file to completed
-                                $log.status = "CompletedWithErrors"
-                                Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
-                                foreach ($ErrorRecord in $runspace.powershell.Streams.Error) {
-                                    Write-Error -ErrorRecord $ErrorRecord
-                                }
-                            }
-                            else {
-                                #add logging details and cleanup
-                                $log.status = "Completed"
-                                Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
-                            }
-
-                            #everything is logged, clean up the runspace
-                            $runspace.powershell.EndInvoke($runspace.Runspace)
-                            $runspace.powershell.dispose()
-                            $runspace.Runspace = $null
-                            $runspace.powershell = $null
-                        }
-                        #If runtime exceeds max, dispose the runspace
-                        ElseIf ( $runspaceTimeout -ne 0 -and $runtime.totalseconds -gt $runspaceTimeout) {
-                            $script:completedCount++
-                            $timedOutTasks = $true
-
-                            #add logging details and cleanup
-                            $log.status = "TimedOut"
-                            Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
-                            Write-Error "Runspace timed out at $($runtime.totalseconds) seconds for the object:`n$($runspace.object | out-string)"
-
-                            #Depending on how it hangs, we could still get stuck here as dispose calls a synchronous method on the powershell instance
-                            if (!$noCloseOnTimeout) { $runspace.powershell.dispose() }
-                            $runspace.Runspace = $null
-                            $runspace.powershell = $null
-                            $completedCount++
-                        }
-
-                        #If runspace isn't null set more to true
-                        ElseIf ($runspace.Runspace -ne $null ) {
-                            $log = $null
-                            $more = $true
-                        }
-
-                        #log the results if a log file was indicated
-                        if ($logFile -and $log) {
-                            ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1] | out-file $LogFile -append
-                        }
-                    }
-
-                    #Clean out unused runspace jobs
-                    $temphash = $runspaces.clone()
-                    $temphash | Where-Object { $_.runspace -eq $Null } | ForEach-Object {
-                        $Runspaces.remove($_)
-                    }
-
-                    #sleep for a bit if we will loop again
-                    if ($PSBoundParameters['Wait']) { Start-Sleep -milliseconds $SleepTimer }
-
-                    #Loop again only if -wait parameter and there are more runspaces to process
-                } while ($more -and $PSBoundParameters['Wait'])
-
-                #End of runspace function
-            }
-            #endregion functions
-
-            #region Init
-
-            if ($PSCmdlet.ParameterSetName -eq 'ScriptFile') {
-                $ScriptBlock = [scriptblock]::Create( $(Get-Content $ScriptFile | out-string) )
-            }
-            elseif ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
-                #Start building parameter names for the param block
-                [string[]]$ParamsToAdd = '$_'
-                if ( $PSBoundParameters.ContainsKey('Parameter') ) {
-                    $ParamsToAdd += '$Parameter'
-                }
-
-                $UsingVariableData = $Null
-
-                # This code enables $Using support through the AST.
-                # This is entirely from  Boe Prox, and his https://github.com/proxb/PoshRSJob module; all credit to Boe!
-
-                if ($PSVersionTable.PSVersion.Major -gt 2) {
-                    #Extract using references
-                    $UsingVariables = $ScriptBlock.ast.FindAll( { $args[0] -is [System.Management.Automation.Language.UsingExpressionAst] }, $True)
-
-                    If ($UsingVariables) {
-                        $List = New-Object 'System.Collections.Generic.List`1[System.Management.Automation.Language.VariableExpressionAst]'
-                        ForEach ($Ast in $UsingVariables) {
-                            [void]$list.Add($Ast.SubExpression)
-                        }
-
-                        $UsingVar = $UsingVariables | Group-Object -Property SubExpression | ForEach-Object { $_.Group | Select-Object -First 1 }
-
-                        #Extract the name, value, and create replacements for each
-                        $UsingVariableData = ForEach ($Var in $UsingVar) {
-                            try {
-                                $Value = Get-Variable -Name $Var.SubExpression.VariablePath.UserPath -ErrorAction Stop
-                                [pscustomobject]@{
-                                    Name       = $Var.SubExpression.Extent.Text
-                                    Value      = $Value.Value
-                                    NewName    = ('$__using_{0}' -f $Var.SubExpression.VariablePath.UserPath)
-                                    NewVarName = ('__using_{0}' -f $Var.SubExpression.VariablePath.UserPath)
-                                }
-                            }
-                            catch {
-                                Write-Error "$($Var.SubExpression.Extent.Text) is not a valid Using: variable!"
-                            }
-                        }
-                        $ParamsToAdd += $UsingVariableData | Select-Object -ExpandProperty NewName -Unique
-
-                        $NewParams = $UsingVariableData.NewName -join ', '
-                        $Tuple = [Tuple]::Create($list, $NewParams)
-                        $bindingFlags = [Reflection.BindingFlags]"Default,NonPublic,Instance"
-                        $GetWithInputHandlingForInvokeCommandImpl = ($ScriptBlock.ast.gettype().GetMethod('GetWithInputHandlingForInvokeCommandImpl', $bindingFlags))
-
-                        $StringScriptBlock = $GetWithInputHandlingForInvokeCommandImpl.Invoke($ScriptBlock.ast, @($Tuple))
-
-                        $ScriptBlock = [scriptblock]::Create($StringScriptBlock)
-
-                        Write-Verbose $StringScriptBlock
-                    }
-                }
-
-                $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("param($($ParamsToAdd -Join ", "))`r`n" + $Scriptblock.ToString())
-            }
-            else {
-                Throw "Must provide ScriptBlock or ScriptFile"; Break
-            }
-
-            Write-Debug "`$ScriptBlock: $($ScriptBlock | Out-String)"
-            Write-Verbose "Creating runspace pool and session states"
-
-            #If specified, add variables and modules/snapins to session state
-            $sessionstate = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-            if ($ImportVariables -and $UserVariables.count -gt 0) {
-                foreach ($Variable in $UserVariables) {
-                    $sessionstate.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Variable.Name, $Variable.Value, $null) )
-                }
+                # we don't use 'Get-Variable -Exclude', because it uses regexps.
+                # One of the veriables that we pass is '$?'.
+                # There could be other variables with such problems.
+                # Scope 2 required if we move to a real module
+                $UserVariables = @( Get-Variable | Where-Object { -not ($VariablesToExclude -contains $_.Name) } )
+                Write-Verbose "Found variables to import: $( ($UserVariables | Select-Object -expandproperty Name | Sort-Object ) -join ", " | Out-String).`n"
             }
             if ($ImportModules) {
-                if ($UserModules.count -gt 0) {
-                    foreach ($ModulePath in $UserModules) {
-                        $sessionstate.ImportPSModule($ModulePath)
-                    }
-                }
-                if ($UserSnapins.count -gt 0) {
-                    foreach ($PSSnapin in $UserSnapins) {
-                        [void]$sessionstate.ImportPSSnapIn($PSSnapin, [ref]$null)
-                    }
-                }
+                $UserModules = @( Get-Module | Where-Object { $StandardUserEnv.Modules -notcontains $_.Name -and (Test-Path $_.Path -ErrorAction SilentlyContinue) } | Select-Object -ExpandProperty Path )
+                $UserSnapins = @( Get-PSSnapin | Select-Object -ExpandProperty Name | Where-Object { $StandardUserEnv.Snapins -notcontains $_ } )
             }
-            if ($ImportFunctions -and $UserFunctions.count -gt 0) {
-                foreach ($FunctionDef in $UserFunctions) {
-                    $sessionstate.Commands.Add((New-Object System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $FunctionDef.Name, $FunctionDef.ScriptBlock))
-                }
-            }
-
-            #Create runspace pool
-            $runspacepool = [runspacefactory]::CreateRunspacePool(1, $Throttle, $sessionstate, $Host)
-            $runspacepool.Open()
-
-            Write-Verbose "Creating empty collection to hold runspace jobs"
-            $Script:runspaces = New-Object System.Collections.ArrayList
-
-            #If inputObject is bound get a total count and set bound to true
-            $bound = $PSBoundParameters.keys -contains "InputObject"
-            if (-not $bound) {
-                [System.Collections.ArrayList]$allObjects = @()
-            }
-
-            #Set up log file if specified
-            if ( $LogFile -and (-not (Test-Path $LogFile) -or $AppendLog -eq $false)) {
-                New-Item -ItemType file -Path $logFile -Force | Out-Null
-                ("" | Select-Object -Property Date, Action, Runtime, Status, Details | ConvertTo-Csv -NoTypeInformation -Delimiter ";")[0] | Out-File $LogFile
-            }
-
-            #write initial log entry
-            $log = "" | Select-Object -Property Date, Action, Runtime, Status, Details
-            $log.Date = Get-Date
-            $log.Action = "Batch processing started"
-            $log.Runtime = $null
-            $log.Status = "Started"
-            $log.Details = $null
-            if ($logFile) {
-                ($log | convertto-csv -Delimiter ";" -NoTypeInformation)[1] | Out-File $LogFile -Append
-            }
-            $timedOutTasks = $false
-            #endregion INIT
-        }
-        process {
-            #add piped objects to all objects or set all objects to bound input object parameter
-            if ($bound) {
-                $allObjects = $InputObject
-            }
-            else {
-                [void]$allObjects.add( $InputObject )
+            if ($ImportFunctions) {
+                $UserFunctions = @( Get-ChildItem function:\ | Where-Object { $StandardUserEnv.Functions -notcontains $_.Name } )
             }
         }
-        end {
-            #Use Try/Finally to catch Ctrl+C and clean up.
-            try {
-                #counts for progress
-                $totalCount = $allObjects.count
-                $script:completedCount = 0
-                $startedCount = 0
-                foreach ($object in $allObjects) {
-                    #region add scripts to runspace pool
-                    #Create the powershell instance, set verbose if needed, supply the scriptblock and parameters
-                    $powershell = [powershell]::Create()
 
-                    if ($VerbosePreference -eq 'Continue') {
-                        [void]$PowerShell.AddScript( { $VerbosePreference = 'Continue' })
+        #region functions
+        Function Get-RunspaceData {
+            [cmdletbinding()]
+            param( [switch]$Wait )
+            #loop through runspaces
+            #if $wait is specified, keep looping until all complete
+            Do {
+                #set more to false for tracking completion
+                $more = $false
+
+                #Progress bar if we have inputobject count (bound parameter)
+                if (-not $Quiet) {
+                    Write-Progress -Id $ProgressId -Activity "Running Query" -Status "Starting threads"`
+                        -CurrentOperation "$startedCount threads defined - $totalCount input objects - $script:completedCount input objects processed"`
+                        -PercentComplete $( Try { $script:completedCount / $totalCount * 100 } Catch { 0 } )
+                }
+
+                #run through each runspace.
+                Foreach ($runspace in $runspaces) {
+
+                    #get the duration - inaccurate
+                    $currentdate = Get-Date
+                    $runtime = $currentdate - $runspace.startTime
+                    $runMin = [math]::Round( $runtime.totalminutes , 2 )
+
+                    #set up log object
+                    $log = "" | Select-Object Date, Action, Runtime, Status, Details
+                    $log.Action = "Removing:'$($runspace.object)'"
+                    $log.Date = $currentdate
+                    $log.Runtime = "$runMin minutes"
+
+                    #If runspace completed, end invoke, dispose, recycle, counter++
+                    If ($runspace.Runspace.isCompleted) {
+
+                        $script:completedCount++
+
+                        #check if there were errors
+                        if ($runspace.powershell.Streams.Error.Count -gt 0) {
+                            #set the logging info and move the file to completed
+                            $log.status = "CompletedWithErrors"
+                            Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
+                            foreach ($ErrorRecord in $runspace.powershell.Streams.Error) {
+                                Write-Error -ErrorRecord $ErrorRecord
+                            }
+                        }
+                        else {
+                            #add logging details and cleanup
+                            $log.status = "Completed"
+                            Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
+                        }
+
+                        #everything is logged, clean up the runspace
+                        $runspace.powershell.EndInvoke($runspace.Runspace)
+                        $runspace.powershell.dispose()
+                        $runspace.Runspace = $null
+                        $runspace.powershell = $null
+                    }
+                    #If runtime exceeds max, dispose the runspace
+                    ElseIf ( $runspaceTimeout -ne 0 -and $runtime.totalseconds -gt $runspaceTimeout) {
+                        $script:completedCount++
+                        $timedOutTasks = $true
+
+                        #add logging details and cleanup
+                        $log.status = "TimedOut"
+                        Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
+                        Write-Error "Runspace timed out at $($runtime.totalseconds) seconds for the object:`n$($runspace.object | out-string)"
+
+                        #Depending on how it hangs, we could still get stuck here as dispose calls a synchronous method on the powershell instance
+                        if (!$noCloseOnTimeout) { $runspace.powershell.dispose() }
+                        $runspace.Runspace = $null
+                        $runspace.powershell = $null
+                        $completedCount++
                     }
 
-                    [void]$PowerShell.AddScript($ScriptBlock).AddArgument($object)
-
-                    if ($parameter) {
-                        [void]$PowerShell.AddArgument($parameter)
+                    #If runspace isn't null set more to true
+                    ElseIf ($runspace.Runspace -ne $null ) {
+                        $log = $null
+                        $more = $true
                     }
 
-                    # $Using support from Boe Prox
-                    if ($UsingVariableData) {
-                        Foreach ($UsingVariable in $UsingVariableData) {
-                            Write-Verbose "Adding $($UsingVariable.Name) with value: $($UsingVariable.Value)"
-                            [void]$PowerShell.AddArgument($UsingVariable.Value)
+                    #log the results if a log file was indicated
+                    if ($logFile -and $log) {
+                        ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1] | out-file $LogFile -append
+                    }
+                }
+
+                #Clean out unused runspace jobs
+                $temphash = $runspaces.clone()
+                $temphash | Where-Object { $_.runspace -eq $Null } | ForEach-Object {
+                    $Runspaces.remove($_)
+                }
+
+                #sleep for a bit if we will loop again
+                if ($PSBoundParameters['Wait']) { Start-Sleep -milliseconds $SleepTimer }
+
+                #Loop again only if -wait parameter and there are more runspaces to process
+            } while ($more -and $PSBoundParameters['Wait'])
+
+            #End of runspace function
+        }
+        #endregion functions
+
+        #region Init
+
+        if ($PSCmdlet.ParameterSetName -eq 'ScriptFile') {
+            $ScriptBlock = [scriptblock]::Create( $(Get-Content $ScriptFile | out-string) )
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
+            #Start building parameter names for the param block
+            [string[]]$ParamsToAdd = '$_'
+            if ( $PSBoundParameters.ContainsKey('Parameter') ) {
+                $ParamsToAdd += '$Parameter'
+            }
+
+            $UsingVariableData = $Null
+
+            # This code enables $Using support through the AST.
+            # This is entirely from  Boe Prox, and his https://github.com/proxb/PoshRSJob module; all credit to Boe!
+
+            if ($PSVersionTable.PSVersion.Major -gt 2) {
+                #Extract using references
+                $UsingVariables = $ScriptBlock.ast.FindAll( { $args[0] -is [System.Management.Automation.Language.UsingExpressionAst] }, $True)
+
+                If ($UsingVariables) {
+                    $List = New-Object 'System.Collections.Generic.List`1[System.Management.Automation.Language.VariableExpressionAst]'
+                    ForEach ($Ast in $UsingVariables) {
+                        [void]$list.Add($Ast.SubExpression)
+                    }
+
+                    $UsingVar = $UsingVariables | Group-Object -Property SubExpression | ForEach-Object { $_.Group | Select-Object -First 1 }
+
+                    #Extract the name, value, and create replacements for each
+                    $UsingVariableData = ForEach ($Var in $UsingVar) {
+                        try {
+                            $Value = Get-Variable -Name $Var.SubExpression.VariablePath.UserPath -ErrorAction Stop
+                            [pscustomobject]@{
+                                Name       = $Var.SubExpression.Extent.Text
+                                Value      = $Value.Value
+                                NewName    = ('$__using_{0}' -f $Var.SubExpression.VariablePath.UserPath)
+                                NewVarName = ('__using_{0}' -f $Var.SubExpression.VariablePath.UserPath)
+                            }
+                        }
+                        catch {
+                            Write-Error "$($Var.SubExpression.Extent.Text) is not a valid Using: variable!"
                         }
                     }
+                    $ParamsToAdd += $UsingVariableData | Select-Object -ExpandProperty NewName -Unique
 
-                    #Add the runspace into the powershell instance
-                    $powershell.RunspacePool = $runspacepool
+                    $NewParams = $UsingVariableData.NewName -join ', '
+                    $Tuple = [Tuple]::Create($list, $NewParams)
+                    $bindingFlags = [Reflection.BindingFlags]"Default,NonPublic,Instance"
+                    $GetWithInputHandlingForInvokeCommandImpl = ($ScriptBlock.ast.gettype().GetMethod('GetWithInputHandlingForInvokeCommandImpl', $bindingFlags))
 
-                    #Create a temporary collection for each runspace
-                    $temp = "" | Select-Object PowerShell, StartTime, object, Runspace
-                    $temp.PowerShell = $powershell
-                    $temp.StartTime = Get-Date
-                    $temp.object = $object
+                    $StringScriptBlock = $GetWithInputHandlingForInvokeCommandImpl.Invoke($ScriptBlock.ast, @($Tuple))
 
-                    #Save the handle output when calling BeginInvoke() that will be used later to end the runspace
-                    $temp.Runspace = $powershell.BeginInvoke()
-                    $startedCount++
+                    $ScriptBlock = [scriptblock]::Create($StringScriptBlock)
 
-                    #Add the temp tracking info to $runspaces collection
-                    Write-Verbose ( "Adding {0} to collection at {1}" -f $temp.object, $temp.starttime.tostring() )
-                    $runspaces.Add($temp) | Out-Null
-
-                    #loop through existing runspaces one time
-                    Get-RunspaceData
-
-                    #If we have more running than max queue (used to control timeout accuracy)
-                    #Script scope resolves odd PowerShell 2 issue
-                    $firstRun = $true
-                    while ($runspaces.count -ge $Script:MaxQueue) {
-                        #give verbose output
-                        if ($firstRun) {
-                            Write-Verbose "$($runspaces.count) items running - exceeded $Script:MaxQueue limit."
-                        }
-                        $firstRun = $false
-
-                        #run get-runspace data and sleep for a short while
-                        Get-RunspaceData
-                        Start-Sleep -Milliseconds $sleepTimer
-                    }
-                    #endregion add scripts to runspace pool
-                }
-                Write-Verbose ( "Finish processing the remaining runspace jobs: {0}" -f ( @($runspaces | Where-Object { $_.Runspace -ne $Null }).Count) )
-
-                Get-RunspaceData -wait
-                if (-not $quiet) {
-                    Write-Progress -Id $ProgressId -Activity "Running Query" -Status "Starting threads" -Completed
+                    Write-Verbose $StringScriptBlock
                 }
             }
-            finally {
-                #Close the runspace pool, unless we specified no close on timeout and something timed out
-                if ( ($timedOutTasks -eq $false) -or ( ($timedOutTasks -eq $true) -and ($noCloseOnTimeout -eq $false) ) ) {
-                    Write-Verbose "Closing the runspace pool"
-                    $runspacepool.close()
-                }
-                #collect garbage
-                [gc]::Collect()
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("param($($ParamsToAdd -Join ", "))`r`n" + $Scriptblock.ToString())
+        }
+        else {
+            Throw "Must provide ScriptBlock or ScriptFile"; Break
+        }
+
+        Write-Debug "`$ScriptBlock: $($ScriptBlock | Out-String)"
+        Write-Verbose "Creating runspace pool and session states"
+
+        #If specified, add variables and modules/snapins to session state
+        $sessionstate = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        if ($ImportVariables -and $UserVariables.count -gt 0) {
+            foreach ($Variable in $UserVariables) {
+                $sessionstate.Variables.Add((New-Object -TypeName System.Management.Automation.Runspaces.SessionStateVariableEntry -ArgumentList $Variable.Name, $Variable.Value, $null) )
             }
+        }
+        if ($ImportModules) {
+            if ($UserModules.count -gt 0) {
+                foreach ($ModulePath in $UserModules) {
+                    $sessionstate.ImportPSModule($ModulePath)
+                }
+            }
+            if ($UserSnapins.count -gt 0) {
+                foreach ($PSSnapin in $UserSnapins) {
+                    [void]$sessionstate.ImportPSSnapIn($PSSnapin, [ref]$null)
+                }
+            }
+        }
+        if ($ImportFunctions -and $UserFunctions.count -gt 0) {
+            foreach ($FunctionDef in $UserFunctions) {
+                $sessionstate.Commands.Add((New-Object System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList $FunctionDef.Name, $FunctionDef.ScriptBlock))
+            }
+        }
+
+        #Create runspace pool
+        $runspacepool = [runspacefactory]::CreateRunspacePool(1, $Throttle, $sessionstate, $Host)
+        $runspacepool.Open()
+
+        Write-Verbose "Creating empty collection to hold runspace jobs"
+        $Script:runspaces = New-Object System.Collections.ArrayList
+
+        #If inputObject is bound get a total count and set bound to true
+        $bound = $PSBoundParameters.keys -contains "InputObject"
+        if (-not $bound) {
+            [System.Collections.ArrayList]$allObjects = @()
+        }
+
+        #Set up log file if specified
+        if ( $LogFile -and (-not (Test-Path $LogFile) -or $AppendLog -eq $false)) {
+            New-Item -ItemType file -Path $logFile -Force | Out-Null
+            ("" | Select-Object -Property Date, Action, Runtime, Status, Details | ConvertTo-Csv -NoTypeInformation -Delimiter ";")[0] | Out-File $LogFile
+        }
+
+        #write initial log entry
+        $log = "" | Select-Object -Property Date, Action, Runtime, Status, Details
+        $log.Date = Get-Date
+        $log.Action = "Batch processing started"
+        $log.Runtime = $null
+        $log.Status = "Started"
+        $log.Details = $null
+        if ($logFile) {
+            ($log | convertto-csv -Delimiter ";" -NoTypeInformation)[1] | Out-File $LogFile -Append
+        }
+        $timedOutTasks = $false
+        #endregion INIT
+    }
+    process {
+        #add piped objects to all objects or set all objects to bound input object parameter
+        if ($bound) {
+            $allObjects = $InputObject
+        }
+        else {
+            [void]$allObjects.add( $InputObject )
         }
     }
+    end {
+        #Use Try/Finally to catch Ctrl+C and clean up.
+        try {
+            #counts for progress
+            $totalCount = $allObjects.count
+            $script:completedCount = 0
+            $startedCount = 0
+            foreach ($object in $allObjects) {
+                #region add scripts to runspace pool
+                #Create the powershell instance, set verbose if needed, supply the scriptblock and parameters
+                $powershell = [powershell]::Create()
+
+                if ($VerbosePreference -eq 'Continue') {
+                    [void]$PowerShell.AddScript( { $VerbosePreference = 'Continue' })
+                }
+
+                [void]$PowerShell.AddScript($ScriptBlock).AddArgument($object)
+
+                if ($parameter) {
+                    [void]$PowerShell.AddArgument($parameter)
+                }
+
+                # $Using support from Boe Prox
+                if ($UsingVariableData) {
+                    Foreach ($UsingVariable in $UsingVariableData) {
+                        Write-Verbose "Adding $($UsingVariable.Name) with value: $($UsingVariable.Value)"
+                        [void]$PowerShell.AddArgument($UsingVariable.Value)
+                    }
+                }
+
+                #Add the runspace into the powershell instance
+                $powershell.RunspacePool = $runspacepool
+
+                #Create a temporary collection for each runspace
+                $temp = "" | Select-Object PowerShell, StartTime, object, Runspace
+                $temp.PowerShell = $powershell
+                $temp.StartTime = Get-Date
+                $temp.object = $object
+
+                #Save the handle output when calling BeginInvoke() that will be used later to end the runspace
+                $temp.Runspace = $powershell.BeginInvoke()
+                $startedCount++
+
+                #Add the temp tracking info to $runspaces collection
+                Write-Verbose ( "Adding {0} to collection at {1}" -f $temp.object, $temp.starttime.tostring() )
+                $runspaces.Add($temp) | Out-Null
+
+                #loop through existing runspaces one time
+                Get-RunspaceData
+
+                #If we have more running than max queue (used to control timeout accuracy)
+                #Script scope resolves odd PowerShell 2 issue
+                $firstRun = $true
+                while ($runspaces.count -ge $Script:MaxQueue) {
+                    #give verbose output
+                    if ($firstRun) {
+                        Write-Verbose "$($runspaces.count) items running - exceeded $Script:MaxQueue limit."
+                    }
+                    $firstRun = $false
+
+                    #run get-runspace data and sleep for a short while
+                    Get-RunspaceData
+                    Start-Sleep -Milliseconds $sleepTimer
+                }
+                #endregion add scripts to runspace pool
+            }
+            Write-Verbose ( "Finish processing the remaining runspace jobs: {0}" -f ( @($runspaces | Where-Object { $_.Runspace -ne $Null }).Count) )
+
+            Get-RunspaceData -wait
+            if (-not $quiet) {
+                Write-Progress -Id $ProgressId -Activity "Running Query" -Status "Starting threads" -Completed
+            }
+        }
+        finally {
+            #Close the runspace pool, unless we specified no close on timeout and something timed out
+            if ( ($timedOutTasks -eq $false) -or ( ($timedOutTasks -eq $true) -and ($noCloseOnTimeout -eq $false) ) ) {
+                Write-Verbose "Closing the runspace pool"
+                $runspacepool.close()
+            }
+            #collect garbage
+            [gc]::Collect()
+        }
+    }
+}
 
     #Mount-FslDisk
-    function Mount-FslDisk {
-        [CmdletBinding()]
+function Mount-FslDisk {
+    [CmdletBinding()]
 
-        Param (
-            [Parameter(
-                Position = 1,
-                ValuefromPipelineByPropertyName = $true,
-                ValuefromPipeline = $true,
-                Mandatory = $true
-            )]
-            [alias('FullName')]
-            [System.String]$Path,
+    Param (
+        [Parameter(
+            Position = 1,
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [alias('FullName')]
+        [System.String]$Path,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-            [System.String]$PartitionNumber = 1,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
+        [System.String]$PartitionNumber = 1,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [Switch]$PassThru
-        )
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Switch]$PassThru
+    )
 
-        BEGIN {
-            Set-StrictMode -Version Latest
-        } # Begin
-        PROCESS {
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-            try {
-                # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-                $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage -ErrorAction Stop
-            }
-            catch {
-                Write-Error "Failed to mount disk $Path"
-                return
-            }
+        try {
+            # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop #| Get-DiskImage -ErrorAction Stop
+        }
+        catch {
+            Write-Error "Failed to mount disk $Path"
+            return
+        }
 
-            # Assign vhd to a random path in temp folder so we don't have to worry about free drive letters which can be horrible
-            # New-Guid not used here for PoSh 3 compatibility
-            $tempGUID = [guid]::NewGuid().ToString()
-            $mountPath = Join-Path $Env:Temp ('FSLogixMnt-' + $tempGUID)
+        # Assign vhd to a random path in temp folder so we don't have to worry about free drive letters which can be horrible
+        # New-Guid not used here for PoSh 3 compatibility
+        $tempGUID = [guid]::NewGuid().ToString()
+        $mountPath = Join-Path $Env:Temp ('FSLogixMnt-' + $tempGUID)
 
-            try {
-                # Create directory which we will mount too
-                New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
-            }
-            catch {
-                Write-Error "Failed to create mounting directory $mountPath"
-                # Cleanup
-                $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-                return
-            }
+        try {
+            # Create directory which we will mount too
+            New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-Error "Failed to create mounting directory $mountPath"
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            return
+        }
 
-            try {
-                $addPartitionAccessPathParams = @{
-                    DiskNumber      = $mountedDisk.Number
-                    PartitionNumber = $PartitionNumber
-                    AccessPath      = $mountPath
-                    ErrorAction     = 'Stop'
-                }
-
-                Add-PartitionAccessPath @addPartitionAccessPathParams
-            }
-            catch {
-                Write-Error "Failed to create junction point to $mountPath"
-                # Cleanup
-                Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
-                $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-                return
+        try {
+            $addPartitionAccessPathParams = @{
+                DiskNumber      = $mountedDisk.Number
+                PartitionNumber = $PartitionNumber
+                AccessPath      = $mountPath
+                ErrorAction     = 'Stop'
             }
 
-            if ($PassThru) {
-                # Create output required for piping to Dismount-FslDisk
-                $output = [PSCustomObject]@{
-                    Path       = $mountPath
-                    DiskNumber = $mountedDisk.Number
-                    ImagePath  = $mountedDisk.ImagePath
-                }
-                Write-Output $output
-            }
-            Write-Verbose "Mounted $Path to $mountPath"
-        } #Process
-        END {
+            Add-PartitionAccessPath @addPartitionAccessPathParams
+        }
+        catch {
+            Write-Error "Failed to create junction point to $mountPath"
+            # Cleanup
+            Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            return
+        }
 
-        } #End
-    }  #function Mount-FslDisk
+        if ($PassThru) {
+            # Create output required for piping to Dismount-FslDisk
+            $output = [PSCustomObject]@{
+                Path       = $mountPath
+                DiskNumber = $mountedDisk.Number
+                ImagePath  = $mountedDisk.ImagePath
+            }
+            Write-Output $output
+        }
+        Write-Verbose "Mounted $Path to $mountPath"
+    } #Process
+    END {
+
+    } #End
+}  #function Mount-FslDisk
 
     #Dismount-FslDisk
-    function Dismount-FslDisk {
-        [CmdletBinding()]
+function Dismount-FslDisk {
+    [CmdletBinding()]
 
-        Param (
-            [Parameter(
-                Position = 1,
-                ValuefromPipelineByPropertyName = $true,
-                ValuefromPipeline = $true,
-                Mandatory = $true
-            )]
-            [String]$Path,
+    Param (
+        [Parameter(
+            Position = 1,
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [String]$Path,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true,
-                ValuefromPipeline = $true,
-                Mandatory = $true
-            )]
-            [int16]$DiskNumber,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            Mandatory = $true
+        )]
+        [String]$ImagePath,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true,
-                Mandatory = $true
-            )]
-            [String]$ImagePath,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Switch]$PassThru
+    )
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [Switch]$PassThru
-        )
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-        BEGIN {
-            Set-StrictMode -Version Latest
-        } # Begin
-        PROCESS {
+        $mountRemoved = $false
+        $directoryRemoved = $false
 
-            # FSLogix Disk Partition Number this won't work with vhds created with MS tools as their main partition number is 2
-            $partitionNumber = 1
+        # Reverse the tasks from Mount-FslDisk
 
-            if ($PassThru) {
-                $junctionPointRemoved = $false
-                $mountRemoved = $false
+        $timeStampDirectory = (Get-Date).AddSeconds(10)
+
+        while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
+            try {
+                Remove-Item -Path $Path -Force -ErrorAction Stop | Out-Null
+                $directoryRemoved = $true
+            }
+            catch {
                 $directoryRemoved = $false
             }
+        }
+        if (Test-Path $Path) {
+            Write-Warning "Failed to delete temp mount directory $Path"
+        }
 
-            # Reverse the three tasks from Mount-FslDisk
-            $junctionPointRemoved = $false
-            $timeStampPart = (Get-Date).AddSeconds(10)
 
-            while ((Get-Date) -lt $timeStampPart -and $junctionPointRemoved -ne $true) {
-                try {
-                    Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
-                    $junctionPointRemoved = $true
-                }
-                catch {
-                    $junctionPointRemoved = $false
-                }
+        $timeStampDismount = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
+            try {
+                Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
+                $mountRemoved = $true
             }
-            if ($junctionPointRemoved -eq $false) {
-                Write-Warning "Failed to remove the junction point to $Path"
+            catch {
+                $mountRemoved = $false
             }
+        }
+        if ($mountRemoved -ne $true) {
+            Write-Error "Failed to dismount disk $ImagePath"
+        }
 
-            $mountRemoved = $false
-            $timeStampDismount = (Get-Date).AddSeconds(10)
+        If ($PassThru) {
+            $output = [PSCustomObject]@{
+                MountRemoved         = $mountRemoved
+                DirectoryRemoved     = $directoryRemoved
+            }
+            Write-Output $output
+        }
+        if ($directoryRemoved -and $mountRemoved) {
+            Write-Verbose "Dismounted $ImagePath"
+        }
 
-            while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
-                try {
-                    Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                    $mountRemoved = $true
-                }
-                catch {
-                    $mountRemoved = $false
-                }
-            }
-            if ($mountRemoved -eq $false) {
-                Write-Error "Failed to dismount disk $ImagePath"
-            }
-
-            $directoryRemoved = $false
-            $timeStampDirectory = (Get-Date).AddSeconds(10)
-
-            while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
-                try {
-                    Remove-Item -Path $Path -ErrorAction Stop | Out-Null
-                    $directoryRemoved = $true
-                }
-                catch {
-                    $directoryRemoved = $false
-                }
-            }
-            if (Test-Path $Path) {
-                Write-Warning "Failed to delete temp mount directory $Path"
-            }
-
-            If ($PassThru) {
-                $output = [PSCustomObject]@{
-                    JunctionPointRemoved = $junctionPointRemoved
-                    MountRemoved         = $mountRemoved
-                    DirectoryRemoved     = $directoryRemoved
-                }
-                Write-Output $output
-            }
-            if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
-                Write-Verbose "Dismounted $ImagePath"
-            }
-
-        } #Process
-        END { } #End
-    }  #function Dismount-FslDisk
+    } #Process
+    END { } #End
+}  #function Dismount-FslDisk
 
     #Shrink-OneDisk
-    function Shrink-OneDisk {
-        [CmdletBinding()]
+function Shrink-OneDisk {
+    [CmdletBinding()]
 
-        Param (
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true,
-                ValuefromPipeline = $true,
-                Mandatory = $true
-            )]
-            [System.IO.FileInfo]$Disk,
+    Param (
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [System.IO.FileInfo]$Disk,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [Int]$DeleteOlderThanDays,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$DeleteOlderThanDays,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [Int]$IgnoreLessThanGB,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$IgnoreLessThanGB,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [double]$RatioFreeSpace = 0.2,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [double]$RatioFreeSpace = 0.2,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [int]$PartitionNumber = 1,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [int]$PartitionNumber = 1,
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
-            [Parameter(
-                ValuefromPipelineByPropertyName = $true
-            )]
-            [switch]$Passthru
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [switch]$Passthru
 
-        )
+    )
 
-        BEGIN {
-            #Requires -RunAsAdministrator
-            Set-StrictMode -Version Latest
-        } # Begin
-        PROCESS {
-            #Grab size of disk being porcessed
-            $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
+    BEGIN {
+        #Requires -RunAsAdministrator
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
+        #Grab size of disk being porcessed
+        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
 
-            #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
-            $PSDefaultParameterValues = @{
-                "Write-VhdOutput:Path"           = $LogFilePath
-                "Write-VhdOutput:Name"           = $Disk.Name
-                "Write-VhdOutput:DiskState"      = $null
-                "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
-                "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
-                "Write-VhdOutput:SpaceSavedGB"   = 0
-                "Write-VhdOutput:FullName"       = $Disk.FullName
-                "Write-VhdOutput:Passthru"       = $Passthru
-            }
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
+        $PSDefaultParameterValues = @{
+            "Write-VhdOutput:Path"           = $LogFilePath
+            "Write-VhdOutput:Name"           = $Disk.Name
+            "Write-VhdOutput:DiskState"      = $null
+            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
+            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
+            "Write-VhdOutput:SpaceSavedGB"   = 0
+            "Write-VhdOutput:FullName"       = $Disk.FullName
+            "Write-VhdOutput:Passthru"       = $Passthru
+        }
 
-            #Check it is a disk
-            if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-                Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
-                return
-            }
+        #Check it is a disk
+        if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
+            return
+        }
 
-            #If it's older than x days delete disk
-            If ( $DeleteOlderThanDays ) {
-                if ($Disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
-                    try {
-                        Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                        Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
-                    }
-                    catch {
-                        Write-VhdOutput -DiskState 'DiskDeletionFailed'
-                    }
-                    return
-                }
-            }
-
-            #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
-            if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-                Write-VhdOutput -DiskState 'Ignored'
-                return
-            }
-
-            #Initial disk Mount
-            try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
-            }
-            catch {
-                Write-VhdOutput -DiskState 'DiskLocked'
-                return
-            }
-
-            #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-            try {
-                $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
-                $sizeMax = $partitionsize.SizeMax
-            }
-            catch {
-                Write-VhdOutput -DiskState 'NoPartitionInfo'
-                return
-            }
-
-            #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-
-
-            if ( $partitionsize.SizeMin -gt $disk.Length ) {
-                Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
-                $mount | DisMount-FslDisk
-                return
-            }
-
-
-            if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
+        #If it's older than x days delete disk
+        If ( $DeleteOlderThanDays ) {
+            #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent of access and write
+            $mostRecent = $Disk.LastAccessTime, $Disk.LastWriteTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+            if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
-                    Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
-                    Start-Sleep 1
-                    $mount | DisMount-FslDisk
+                    Remove-Item $Disk.FullName -ErrorAction Stop -Force
+                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
                 }
                 catch {
-                    $mount | DisMount-FslDisk
-                    Write-VhdOutput -DiskState "PartitionShrinkFailed"
-                    return
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
                 }
+                return
+            }
+        }
 
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
+        if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
+            Write-VhdOutput -DiskState 'Ignored'
+            return
+        }
+
+        #Initial disk Mount
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
+        }
+        catch {
+            Write-VhdOutput -DiskState 'DiskLocked'
+            return
+        }
+
+        #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
+        try {
+            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $sizeMax = $partitionsize.SizeMax
+        }
+        catch {
+            Write-VhdOutput -DiskState 'NoPartitionInfo'
+            return
+        }
+
+        #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
+
+
+        if ( $partitionsize.SizeMin -gt $disk.Length ) {
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            $mount | DisMount-FslDisk
+            return
+        }
+
+
+        if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
+            try {
+                Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Start-Sleep 1
+                $mount | DisMount-FslDisk
+            }
+            catch {
+                $mount | DisMount-FslDisk
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                return
+            }
+
+        }
+        else {
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
+            $mount | DisMount-FslDisk
+            return
+        }
+
+        #Change the disk size and grab the new size
+
+
+
+        $retries = 0
+        $success = $false
+        #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
+        while ($retries -lt 30 -and $success -ne $true) {
+
+            $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+
+            #Let's put diskpart into a function just so I can use Pester to Mock it
+            function invoke-diskpart ($Path) {
+                #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
+                #A better way would be to use optimize-vhd from the Hyper-V module,
+                #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
+                #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Add-Content -Path $Path -Value 'COMPACT VDISK'
+                $result = DISKPART /s $Path
+                Write-Output $result
+            }
+
+            $diskPartResult = invoke-diskpart -Path $tempFileName
+
+            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
+            if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
+                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
+                $success = $true
+                Remove-Item $tempFileName
             }
             else {
-                Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
-                $mount | DisMount-FslDisk
-                return
+                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
+                $retries++
+                #if DiskPart fails, try, try again.
             }
+            Start-Sleep 1
+        }
 
-            #Change the disk size and grab the new size
+        If ($success -ne $true) {
+            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Remove-Item $tempFileName
+            return
+        }
 
-
-
-            $retries = 0
-            $success = $false
-            #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
-            while ($retries -lt 30 -and $success -ne $true) {
-
-                $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
-
-                #Let's put diskpart into a function just so I can use Pester to Mock it
-                function invoke-diskpart ($Path) {
-                    #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
-                    #A better way would be to use optimize-vhd from the Hyper-V module,
-                    #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
-                    #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                    #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
-                    Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
-                    Add-Content -Path $Path -Value 'COMPACT VDISK'
-                    $result = DISKPART /s $Path
-                    Write-Output $result
-                }
-
-                $diskPartResult = invoke-diskpart -Path $tempFileName
-
-                #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
-                if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
-                    $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
-                    $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
-                    $success = $true
-                    Remove-Item $tempFileName
-                }
-                else {
-                    Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
-                    $retries++
-                    #if DiskPart fails, try, try again.
-                }
-                Start-Sleep 1
+        #Now we need to reinflate the partition to its previous size
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $paramWriteVhdOutput = @{
+                DiskState    = "Success"
+                FinalSizeGB  = $finalSizeGB
+                SpaceSavedGB = $originalSizeGB - $finalSizeGB
             }
-
-            If ($success -ne $true) {
-                Write-VhdOutput -DiskState "DiskShrinkFailed"
-                Remove-Item $tempFileName
-                return
-            }
-
-            #Now we need to reinflate the partition to its previous size
-            try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-                Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
-                $paramWriteVhdOutput = @{
-                    DiskState    = "Success"
-                    FinalSizeGB  = $finalSizeGB
-                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
-                }
-                Write-VhdOutput @paramWriteVhdOutput
-            }
-            catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
-                return
-            }
-            finally {
-                $mount | DisMount-FslDisk
-            }
-        } #Process
-        END { } #End
-    }  #function Shrink-OneDisk
+            Write-VhdOutput @paramWriteVhdOutput
+        }
+        catch {
+            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+            return
+        }
+        finally {
+            $mount | DisMount-FslDisk
+        }
+    } #Process
+    END { } #End
+}  #function Shrink-OneDisk
 
     #Write Output to file and optionally to pipeline
-    function Write-VhdOutput {
-        [CmdletBinding()]
+function Write-VhdOutput {
+    [CmdletBinding()]
 
-        Param (
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$Path,
+    Param (
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$Path,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$Name,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$Name,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$DiskState,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$DiskState,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$OriginalSizeGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$OriginalSizeGB,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$FinalSizeGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$FinalSizeGB,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$SpaceSavedGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$SpaceSavedGB,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [System.String]$FullName,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$FullName,
 
-            [Parameter(
-                Mandatory = $true
-            )]
-            [Switch]$Passthru
-        )
+        [Parameter(
+            Mandatory = $true
+        )]
+        [Switch]$Passthru
+    )
 
-        BEGIN {
-            Set-StrictMode -Version Latest
-        } # Begin
-        PROCESS {
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-            $output = [PSCustomObject]@{
-                Name           = $Name
-                DiskState      = $DiskState
-                OriginalSizeGB = $OriginalSizeGB
-                FinalSizeGB    = $FinalSizeGB
-                SpaceSavedGB   = $SpaceSavedGB
-                FullName       = $FullName
+        $output = [PSCustomObject]@{
+            Name           = $Name
+            DiskState      = $DiskState
+            OriginalSizeGB = $OriginalSizeGB
+            FinalSizeGB    = $FinalSizeGB
+            SpaceSavedGB   = $SpaceSavedGB
+            FullName       = $FullName
+        }
+
+        if ($Passthru) {
+            Write-Output $output
+        }
+        $success = $False
+        $retries = 0
+        while ($retries -lt 10 -and $success -ne $true) {
+            try{
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $success = $true
             }
-
-            if ($Passthru) {
-                Write-Output $output
+            catch{
+                $retries++
             }
-            $success = $False
-            $retries = 0
-            while ($retries -lt 10 -and $success -ne $true) {
-                try {
-                    $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
-                    $success = $true
-                }
-                catch {
-                    $retries++
-                }
-                Start-Sleep 1
-            }
+            Start-Sleep 1
+        }
 
 
-        } #Process
-        END { } #End
-    }  #function Write-VhdOutput.ps1
+    } #Process
+    END { } #End
+}  #function Write-VhdOutput.ps1
 
 } # Begin
 PROCESS {
@@ -1251,490 +1222,461 @@ PROCESS {
         #ForEach-Object -Parallel doesn't seem to want to import functions, so defining them twice, good job this is automated.
 
         #Mount-FslDisk
-        function Mount-FslDisk {
-            [CmdletBinding()]
+function Mount-FslDisk {
+    [CmdletBinding()]
 
-            Param (
-                [Parameter(
-                    Position = 1,
-                    ValuefromPipelineByPropertyName = $true,
-                    ValuefromPipeline = $true,
-                    Mandatory = $true
-                )]
-                [alias('FullName')]
-                [System.String]$Path,
+    Param (
+        [Parameter(
+            Position = 1,
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [alias('FullName')]
+        [System.String]$Path,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-                [System.String]$PartitionNumber = 1,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
+        [System.String]$PartitionNumber = 1,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [Switch]$PassThru
-            )
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Switch]$PassThru
+    )
 
-            BEGIN {
-                Set-StrictMode -Version Latest
-            } # Begin
-            PROCESS {
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-                try {
-                    # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-                    $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage -ErrorAction Stop
-                }
-                catch {
-                    Write-Error "Failed to mount disk $Path"
-                    return
-                }
+        try {
+            # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop #| Get-DiskImage -ErrorAction Stop
+        }
+        catch {
+            Write-Error "Failed to mount disk $Path"
+            return
+        }
 
-                # Assign vhd to a random path in temp folder so we don't have to worry about free drive letters which can be horrible
-                # New-Guid not used here for PoSh 3 compatibility
-                $tempGUID = [guid]::NewGuid().ToString()
-                $mountPath = Join-Path $Env:Temp ('FSLogixMnt-' + $tempGUID)
+        # Assign vhd to a random path in temp folder so we don't have to worry about free drive letters which can be horrible
+        # New-Guid not used here for PoSh 3 compatibility
+        $tempGUID = [guid]::NewGuid().ToString()
+        $mountPath = Join-Path $Env:Temp ('FSLogixMnt-' + $tempGUID)
 
-                try {
-                    # Create directory which we will mount too
-                    New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
-                }
-                catch {
-                    Write-Error "Failed to create mounting directory $mountPath"
-                    # Cleanup
-                    $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-                    return
-                }
+        try {
+            # Create directory which we will mount too
+            New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-Error "Failed to create mounting directory $mountPath"
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            return
+        }
 
-                try {
-                    $addPartitionAccessPathParams = @{
-                        DiskNumber      = $mountedDisk.Number
-                        PartitionNumber = $PartitionNumber
-                        AccessPath      = $mountPath
-                        ErrorAction     = 'Stop'
-                    }
+        try {
+            $addPartitionAccessPathParams = @{
+                DiskNumber      = $mountedDisk.Number
+                PartitionNumber = $PartitionNumber
+                AccessPath      = $mountPath
+                ErrorAction     = 'Stop'
+            }
 
-                    Add-PartitionAccessPath @addPartitionAccessPathParams
-                }
-                catch {
-                    Write-Error "Failed to create junction point to $mountPath"
-                    # Cleanup
-                    Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
-                    $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-                    return
-                }
+            Add-PartitionAccessPath @addPartitionAccessPathParams
+        }
+        catch {
+            Write-Error "Failed to create junction point to $mountPath"
+            # Cleanup
+            Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            return
+        }
 
-                if ($PassThru) {
-                    # Create output required for piping to Dismount-FslDisk
-                    $output = [PSCustomObject]@{
-                        Path       = $mountPath
-                        DiskNumber = $mountedDisk.Number
-                        ImagePath  = $mountedDisk.ImagePath
-                    }
-                    Write-Output $output
-                }
-                Write-Verbose "Mounted $Path to $mountPath"
-            } #Process
-            END {
+        if ($PassThru) {
+            # Create output required for piping to Dismount-FslDisk
+            $output = [PSCustomObject]@{
+                Path       = $mountPath
+                DiskNumber = $mountedDisk.Number
+                ImagePath  = $mountedDisk.ImagePath
+            }
+            Write-Output $output
+        }
+        Write-Verbose "Mounted $Path to $mountPath"
+    } #Process
+    END {
 
-            } #End
-        }  #function Mount-FslDisk
+    } #End
+}  #function Mount-FslDisk
         #Dismount-FslDisk
-        function Dismount-FslDisk {
-            [CmdletBinding()]
+function Dismount-FslDisk {
+    [CmdletBinding()]
 
-            Param (
-                [Parameter(
-                    Position = 1,
-                    ValuefromPipelineByPropertyName = $true,
-                    ValuefromPipeline = $true,
-                    Mandatory = $true
-                )]
-                [String]$Path,
+    Param (
+        [Parameter(
+            Position = 1,
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [String]$Path,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true,
-                    ValuefromPipeline = $true,
-                    Mandatory = $true
-                )]
-                [int16]$DiskNumber,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            Mandatory = $true
+        )]
+        [String]$ImagePath,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true,
-                    Mandatory = $true
-                )]
-                [String]$ImagePath,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Switch]$PassThru
+    )
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [Switch]$PassThru
-            )
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-            BEGIN {
-                Set-StrictMode -Version Latest
-            } # Begin
-            PROCESS {
+        $mountRemoved = $false
+        $directoryRemoved = $false
 
-                # FSLogix Disk Partition Number this won't work with vhds created with MS tools as their main partition number is 2
-                $partitionNumber = 1
+        # Reverse the tasks from Mount-FslDisk
 
-                if ($PassThru) {
-                    $junctionPointRemoved = $false
-                    $mountRemoved = $false
-                    $directoryRemoved = $false
-                }
+        $timeStampDirectory = (Get-Date).AddSeconds(10)
 
-                # Reverse the three tasks from Mount-FslDisk
-                $junctionPointRemoved = $false
-                $timeStampPart = (Get-Date).AddSeconds(10)
-
-                while ((Get-Date) -lt $timeStampPart -and $junctionPointRemoved -ne $true) {
-                    try {
-                        Remove-PartitionAccessPath -DiskNumber $DiskNumber -PartitionNumber $partitionNumber -AccessPath $Path -ErrorAction Stop | Out-Null
-                        $junctionPointRemoved = $true
-                    }
-                    catch {
-                        $junctionPointRemoved = $false
-                    }
-                }
-                if ($junctionPointRemoved -eq $false) {
-                    Write-Warning "Failed to remove the junction point to $Path"
-                }
-
-                $mountRemoved = $false
-                $timeStampDismount = (Get-Date).AddSeconds(10)
-
-                while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
-                    try {
-                        Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                        $mountRemoved = $true
-                    }
-                    catch {
-                        $mountRemoved = $false
-                    }
-                }
-                if ($mountRemoved -eq $false) {
-                    Write-Error "Failed to dismount disk $ImagePath"
-                }
-
+        while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
+            try {
+                Remove-Item -Path $Path -Force -ErrorAction Stop | Out-Null
+                $directoryRemoved = $true
+            }
+            catch {
                 $directoryRemoved = $false
-                $timeStampDirectory = (Get-Date).AddSeconds(10)
+            }
+        }
+        if (Test-Path $Path) {
+            Write-Warning "Failed to delete temp mount directory $Path"
+        }
 
-                while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
-                    try {
-                        Remove-Item -Path $Path -ErrorAction Stop | Out-Null
-                        $directoryRemoved = $true
-                    }
-                    catch {
-                        $directoryRemoved = $false
-                    }
-                }
-                if (Test-Path $Path) {
-                    Write-Warning "Failed to delete temp mount directory $Path"
-                }
 
-                If ($PassThru) {
-                    $output = [PSCustomObject]@{
-                        JunctionPointRemoved = $junctionPointRemoved
-                        MountRemoved         = $mountRemoved
-                        DirectoryRemoved     = $directoryRemoved
-                    }
-                    Write-Output $output
-                }
-                if ($directoryRemoved -and $mountRemoved -and $junctionPointRemoved) {
-                    Write-Verbose "Dismounted $ImagePath"
-                }
+        $timeStampDismount = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
+            try {
+                Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
+                $mountRemoved = $true
+            }
+            catch {
+                $mountRemoved = $false
+            }
+        }
+        if ($mountRemoved -ne $true) {
+            Write-Error "Failed to dismount disk $ImagePath"
+        }
 
-            } #Process
-            END { } #End
-        }  #function Dismount-FslDisk
+        If ($PassThru) {
+            $output = [PSCustomObject]@{
+                MountRemoved         = $mountRemoved
+                DirectoryRemoved     = $directoryRemoved
+            }
+            Write-Output $output
+        }
+        if ($directoryRemoved -and $mountRemoved) {
+            Write-Verbose "Dismounted $ImagePath"
+        }
+
+    } #Process
+    END { } #End
+}  #function Dismount-FslDisk
         #Shrink-OneDisk
-        function Shrink-OneDisk {
-            [CmdletBinding()]
+function Shrink-OneDisk {
+    [CmdletBinding()]
 
-            Param (
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true,
-                    ValuefromPipeline = $true,
-                    Mandatory = $true
-                )]
-                [System.IO.FileInfo]$Disk,
+    Param (
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+            Mandatory = $true
+        )]
+        [System.IO.FileInfo]$Disk,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [Int]$DeleteOlderThanDays,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$DeleteOlderThanDays,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [Int]$IgnoreLessThanGB,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$IgnoreLessThanGB,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [double]$RatioFreeSpace = 0.2,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [double]$RatioFreeSpace = 0.2,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [int]$PartitionNumber = 1,
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [int]$PartitionNumber = 1,
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
-                [Parameter(
-                    ValuefromPipelineByPropertyName = $true
-                )]
-                [switch]$Passthru
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [switch]$Passthru
 
-            )
+    )
 
-            BEGIN {
-                #Requires -RunAsAdministrator
-                Set-StrictMode -Version Latest
-            } # Begin
-            PROCESS {
-                #Grab size of disk being porcessed
-                $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
+    BEGIN {
+        #Requires -RunAsAdministrator
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
+        #Grab size of disk being porcessed
+        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
 
-                #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
-                $PSDefaultParameterValues = @{
-                    "Write-VhdOutput:Path"           = $LogFilePath
-                    "Write-VhdOutput:Name"           = $Disk.Name
-                    "Write-VhdOutput:DiskState"      = $null
-                    "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
-                    "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
-                    "Write-VhdOutput:SpaceSavedGB"   = 0
-                    "Write-VhdOutput:FullName"       = $Disk.FullName
-                    "Write-VhdOutput:Passthru"       = $Passthru
-                }
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
+        $PSDefaultParameterValues = @{
+            "Write-VhdOutput:Path"           = $LogFilePath
+            "Write-VhdOutput:Name"           = $Disk.Name
+            "Write-VhdOutput:DiskState"      = $null
+            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
+            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
+            "Write-VhdOutput:SpaceSavedGB"   = 0
+            "Write-VhdOutput:FullName"       = $Disk.FullName
+            "Write-VhdOutput:Passthru"       = $Passthru
+        }
 
-                #Check it is a disk
-                if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-                    Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
-                    return
-                }
+        #Check it is a disk
+        if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
+            return
+        }
 
-                #If it's older than x days delete disk
-                If ( $DeleteOlderThanDays ) {
-                    if ($Disk.LastAccessTime -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
-                        try {
-                            Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                            Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
-                        }
-                        catch {
-                            Write-VhdOutput -DiskState 'DiskDeletionFailed'
-                        }
-                        return
-                    }
-                }
-
-                #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
-                if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-                    Write-VhdOutput -DiskState 'Ignored'
-                    return
-                }
-
-                #Initial disk Mount
+        #If it's older than x days delete disk
+        If ( $DeleteOlderThanDays ) {
+            #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent of access and write
+            $mostRecent = $Disk.LastAccessTime, $Disk.LastWriteTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+            if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
-                    $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
+                    Remove-Item $Disk.FullName -ErrorAction Stop -Force
+                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
                 }
                 catch {
-                    Write-VhdOutput -DiskState 'DiskLocked'
-                    return
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
                 }
+                return
+            }
+        }
 
-                #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-                try {
-                    $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
-                    $sizeMax = $partitionsize.SizeMax
-                }
-                catch {
-                    Write-VhdOutput -DiskState 'NoPartitionInfo'
-                    return
-                }
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
+        if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
+            Write-VhdOutput -DiskState 'Ignored'
+            return
+        }
 
-                #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
+        #Initial disk Mount
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
+        }
+        catch {
+            Write-VhdOutput -DiskState 'DiskLocked'
+            return
+        }
 
+        #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
+        try {
+            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $sizeMax = $partitionsize.SizeMax
+        }
+        catch {
+            Write-VhdOutput -DiskState 'NoPartitionInfo'
+            return
+        }
 
-                if ( $partitionsize.SizeMin -gt $disk.Length ) {
-                    Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
-                    $mount | DisMount-FslDisk
-                    return
-                }
-
-
-                if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
-                    try {
-                        Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
-                        Start-Sleep 1
-                        $mount | DisMount-FslDisk
-                    }
-                    catch {
-                        $mount | DisMount-FslDisk
-                        Write-VhdOutput -DiskState "PartitionShrinkFailed"
-                        return
-                    }
-
-                }
-                else {
-                    Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
-                    $mount | DisMount-FslDisk
-                    return
-                }
-
-                #Change the disk size and grab the new size
+        #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
 
+        if ( $partitionsize.SizeMin -gt $disk.Length ) {
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            $mount | DisMount-FslDisk
+            return
+        }
 
-                $retries = 0
-                $success = $false
-                #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
-                while ($retries -lt 30 -and $success -ne $true) {
 
-                    $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+        if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
+            try {
+                Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Start-Sleep 1
+                $mount | DisMount-FslDisk
+            }
+            catch {
+                $mount | DisMount-FslDisk
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                return
+            }
 
-                    #Let's put diskpart into a function just so I can use Pester to Mock it
-                    function invoke-diskpart ($Path) {
-                        #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
-                        #A better way would be to use optimize-vhd from the Hyper-V module,
-                        #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
-                        #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                        #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
-                        Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
-                        Add-Content -Path $Path -Value 'COMPACT VDISK'
-                        $result = DISKPART /s $Path
-                        Write-Output $result
-                    }
+        }
+        else {
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
+            $mount | DisMount-FslDisk
+            return
+        }
 
-                    $diskPartResult = invoke-diskpart -Path $tempFileName
+        #Change the disk size and grab the new size
 
-                    #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
-                    if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
-                        $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
-                        $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
-                        $success = $true
-                        Remove-Item $tempFileName
-                    }
-                    else {
-                        Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
-                        $retries++
-                        #if DiskPart fails, try, try again.
-                    }
-                    Start-Sleep 1
-                }
 
-                If ($success -ne $true) {
-                    Write-VhdOutput -DiskState "DiskShrinkFailed"
-                    Remove-Item $tempFileName
-                    return
-                }
 
-                #Now we need to reinflate the partition to its previous size
-                try {
-                    $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-                    Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
-                    $paramWriteVhdOutput = @{
-                        DiskState    = "Success"
-                        FinalSizeGB  = $finalSizeGB
-                        SpaceSavedGB = $originalSizeGB - $finalSizeGB
-                    }
-                    Write-VhdOutput @paramWriteVhdOutput
-                }
-                catch {
-                    Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
-                    return
-                }
-                finally {
-                    $mount | DisMount-FslDisk
-                }
-            } #Process
-            END { } #End
-        }  #function Shrink-OneDisk
+        $retries = 0
+        $success = $false
+        #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
+        while ($retries -lt 30 -and $success -ne $true) {
+
+            $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+
+            #Let's put diskpart into a function just so I can use Pester to Mock it
+            function invoke-diskpart ($Path) {
+                #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
+                #A better way would be to use optimize-vhd from the Hyper-V module,
+                #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
+                #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Add-Content -Path $Path -Value 'COMPACT VDISK'
+                $result = DISKPART /s $Path
+                Write-Output $result
+            }
+
+            $diskPartResult = invoke-diskpart -Path $tempFileName
+
+            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
+            if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
+                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
+                $success = $true
+                Remove-Item $tempFileName
+            }
+            else {
+                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
+                $retries++
+                #if DiskPart fails, try, try again.
+            }
+            Start-Sleep 1
+        }
+
+        If ($success -ne $true) {
+            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Remove-Item $tempFileName
+            return
+        }
+
+        #Now we need to reinflate the partition to its previous size
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $paramWriteVhdOutput = @{
+                DiskState    = "Success"
+                FinalSizeGB  = $finalSizeGB
+                SpaceSavedGB = $originalSizeGB - $finalSizeGB
+            }
+            Write-VhdOutput @paramWriteVhdOutput
+        }
+        catch {
+            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+            return
+        }
+        finally {
+            $mount | DisMount-FslDisk
+        }
+    } #Process
+    END { } #End
+}  #function Shrink-OneDisk
         #Write Output to file and optionally to pipeline
-        function Write-VhdOutput {
-            [CmdletBinding()]
+function Write-VhdOutput {
+    [CmdletBinding()]
 
-            Param (
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$Path,
+    Param (
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$Path,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$Name,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$Name,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$DiskState,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$DiskState,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$OriginalSizeGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$OriginalSizeGB,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$FinalSizeGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$FinalSizeGB,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$SpaceSavedGB,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$SpaceSavedGB,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [System.String]$FullName,
+        [Parameter(
+            Mandatory = $true
+        )]
+        [System.String]$FullName,
 
-                [Parameter(
-                    Mandatory = $true
-                )]
-                [Switch]$Passthru
-            )
+        [Parameter(
+            Mandatory = $true
+        )]
+        [Switch]$Passthru
+    )
 
-            BEGIN {
-                Set-StrictMode -Version Latest
-            } # Begin
-            PROCESS {
+    BEGIN {
+        Set-StrictMode -Version Latest
+    } # Begin
+    PROCESS {
 
-                $output = [PSCustomObject]@{
-                    Name           = $Name
-                    DiskState      = $DiskState
-                    OriginalSizeGB = $OriginalSizeGB
-                    FinalSizeGB    = $FinalSizeGB
-                    SpaceSavedGB   = $SpaceSavedGB
-                    FullName       = $FullName
-                }
+        $output = [PSCustomObject]@{
+            Name           = $Name
+            DiskState      = $DiskState
+            OriginalSizeGB = $OriginalSizeGB
+            FinalSizeGB    = $FinalSizeGB
+            SpaceSavedGB   = $SpaceSavedGB
+            FullName       = $FullName
+        }
 
-                if ($Passthru) {
-                    Write-Output $output
-                }
-                $success = $False
-                $retries = 0
-                while ($retries -lt 10 -and $success -ne $true) {
-                    try {
-                        $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
-                        $success = $true
-                    }
-                    catch {
-                        $retries++
-                    }
-                    Start-Sleep 1
-                }
+        if ($Passthru) {
+            Write-Output $output
+        }
+        $success = $False
+        $retries = 0
+        while ($retries -lt 10 -and $success -ne $true) {
+            try{
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $success = $true
+            }
+            catch{
+                $retries++
+            }
+            Start-Sleep 1
+        }
 
 
-            } #Process
-            END { } #End
-        }  #function Write-VhdOutput.ps1
+    } #Process
+    END { } #End
+}  #function Write-VhdOutput.ps1
 
         $paramShrinkOneDisk = @{
             Disk                = $_
