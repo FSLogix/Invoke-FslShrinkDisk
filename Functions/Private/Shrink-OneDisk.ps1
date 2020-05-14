@@ -22,7 +22,7 @@ function Shrink-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [double]$RatioFreeSpace = 0.2,
+        [double]$RatioFreeSpace = 0.05,
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
@@ -98,6 +98,9 @@ function Shrink-OneDisk {
             return
         }
 
+        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
+        Get-Volume -Partition $partInfo | Optimize-Volume
+
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
             $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
@@ -153,8 +156,7 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
-        Get-Volume -Partition $partInfo | Optimize-Volume
+        $mount | DisMount-FslDisk
 
         #Change the disk size and grab the new size
 
