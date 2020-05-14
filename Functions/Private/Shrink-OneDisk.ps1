@@ -108,8 +108,7 @@ function Shrink-OneDisk {
             return
         }
 
-        #If you can't shrink the partition much, you can't reclain a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-
+        #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
             Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
@@ -118,28 +117,46 @@ function Shrink-OneDisk {
         }
 
 
-        if (($partitionsize.SizeMin / $disk.Length) -lt (1 - $RatioFreeSpace) ) {
-            try {
-                Resize-Partition -DiskNumber $mount.DiskNumber -Size $partitionsize.SizeMin -PartitionNumber $PartitionNumber -ErrorAction Stop
-                Start-Sleep 1
-                $mount | DisMount-FslDisk
-            }
-            catch {
-                $mount | DisMount-FslDisk
-                Write-VhdOutput -DiskState "PartitionShrinkFailed"
-                return
-            }
-
-        }
-        else {
+        if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
             Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
             $mount | DisMount-FslDisk
             return
         }
 
+        #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
+        $i = 0
+        $resize = $false
+        $targetSize = $partitionsize.SizeMin
+        $sizeBytesIncrement = 100 * 1024 * 1024
+
+        while ($i -le 5 -and $resize -eq $false){
+
+            try {
+                Resize-Partition -DiskNumber $mount.DiskNumber -Size $targetSize -PartitionNumber $PartitionNumber -ErrorAction Stop
+                $resize = $true
+            }
+            catch {
+                $resize = $false
+                $targetSize = $targetSize + $sizeBytesIncrement
+                $i++
+            }
+            finally{
+                Start-Sleep 1
+            }
+        }
+
+        #Whatever happens now we need to dismount
+
+        if ($resize -eq $false){
+            Write-VhdOutput -DiskState "PartitionShrinkFailed"
+            $mount | DisMount-FslDisk
+            return
+        }
+
+        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
+        Get-Volume -Partition $partInfo | Optimize-Volume
+
         #Change the disk size and grab the new size
-
-
 
         $retries = 0
         $success = $false

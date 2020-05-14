@@ -25,12 +25,13 @@ function Mount-FslDisk {
 
     BEGIN {
         Set-StrictMode -Version Latest
+        #Requires -RunAsAdministrator
     } # Begin
     PROCESS {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop #| Get-DiskImage -ErrorAction Stop
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
             Write-Error "Failed to mount disk $Path"

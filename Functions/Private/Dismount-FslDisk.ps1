@@ -24,6 +24,7 @@ function Dismount-FslDisk {
 
     BEGIN {
         Set-StrictMode -Version Latest
+        #Requires -RunAsAdministrator
     } # Begin
     PROCESS {
 
