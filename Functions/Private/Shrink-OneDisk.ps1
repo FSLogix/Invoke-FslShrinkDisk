@@ -108,6 +108,7 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState 'NoPartitionInfo'
+            $mount | DisMount-FslDisk
             return
         }
 

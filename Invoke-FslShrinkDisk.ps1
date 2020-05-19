@@ -768,7 +768,8 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
+            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
             Write-Error "Failed to mount disk $Path"
@@ -804,7 +805,7 @@ function Mount-FslDisk {
         catch {
             Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
-            Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
+            Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
             return
         }
@@ -865,7 +866,7 @@ function Dismount-FslDisk {
 
         while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
             try {
-                Remove-Item -Path $Path -Force -ErrorAction Stop | Out-Null
+                Remove-Item -Path $Path -Force -Recurse -ErrorAction Stop | Out-Null
                 $directoryRemoved = $true
             }
             catch {
@@ -1017,6 +1018,7 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState 'NoPartitionInfo'
+            $mount | DisMount-FslDisk
             return
         }
 
@@ -1276,7 +1278,8 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
+            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
             Write-Error "Failed to mount disk $Path"
@@ -1312,7 +1315,7 @@ function Mount-FslDisk {
         catch {
             Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
-            Remove-Item -Path $mountPath -ErrorAction SilentlyContinue
+            Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
             return
         }
@@ -1372,7 +1375,7 @@ function Dismount-FslDisk {
 
         while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
             try {
-                Remove-Item -Path $Path -Force -ErrorAction Stop | Out-Null
+                Remove-Item -Path $Path -Force -Recurse -ErrorAction Stop | Out-Null
                 $directoryRemoved = $true
             }
             catch {
@@ -1523,6 +1526,7 @@ function Shrink-OneDisk {
         }
         catch {
             Write-VhdOutput -DiskState 'NoPartitionInfo'
+            $mount | DisMount-FslDisk
             return
         }
 
