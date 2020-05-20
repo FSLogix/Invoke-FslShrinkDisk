@@ -1,3 +1,7 @@
+# Visual Studio Code project files
+.vscode
+
+# Development environment
 start.ps1
 notes.txt
 Setup.ps1
