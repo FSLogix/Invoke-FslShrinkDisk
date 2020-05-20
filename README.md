@@ -2,10 +2,10 @@
 
 # Invoke-FslShrinkDisk.ps1
 
-### .SYNOPSIS
+## .SYNOPSIS
 Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
 
-### .DESCRIPTION
+## .DESCRIPTION
 FSLogix profile and O365 virtual hard disks are in the vhd or vhdx file format. By default, the disks created will be in Dynamically Expanding format rather than Fixed format.  This script does not support reducing the size of a Fixed file format.
 
 Dynamically Expanding disks do not natively shrink when the volume of data within them reduces, they stay at the 'High water mark' of historical data volume within them.
@@ -30,7 +30,7 @@ The script will output a csv in the following format:
     "Profile_user1.vhdx","Success","4.35","3.22","1.13",\\Server\Share\ Profile_user1.vhdx "
     "Profile_user2.vhdx","Success","4.75","3.12","1.63",\\Server\Share\ Profile_user2.vhdx
 
-#### Possible Information values for DiskState are as follows:
+### Possible Information values for DiskState are as follows
 
 | DiskState | Meaning |
 |-----|-----|
@@ -40,7 +40,7 @@ The script will output a csv in the following format:
 | DiskLocked	|		Disk could not be mounted due to being in use |
 | LessThan(x)%FreeInsideDisk | Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
 
-#### Possible Error values for DiskState are as follows:
+### Possible Error values for DiskState are as follows
 | DiskState | Meaning |
 |-----|-----|
 | FileIsNotDiskFormat		| Disk file extension was not vhd or vhdx  |
@@ -61,61 +61,61 @@ All this oneliner does is gather the names and sizes of the virtual hard disks f
     Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv >
 
 
-### .NOTES
+## .NOTES
 Whilst I work for Microsoft and used to work for FSLogix, this is not officially released software from either company.  This is purely a personal project designed to help the community.  If you require support for this tool please raise an issue on the GitHub repository linked below
 
-### .PARAMETER Path
+## .PARAMETER Path
 The path to the folder/share containing the disks. You can also directly specify a single disk. UNC paths are supported.
 
-### .PARAMETER Recurse
+## .PARAMETER Recurse
 Gets the disks in the specified locations and in all child items of the locations
 
-### .PARAMETER IgnoreLessThanGB
+## .PARAMETER IgnoreLessThanGB
 The disk size in GB under which the script will not process the file.
 
-### .PARAMETER DeleteOlderThanDays
+## .PARAMETER DeleteOlderThanDays
 If a disk ‘last access time’ is older than todays date minus this value, the disk will be deleted from the share.  This is a permanent action.
 
-### .PARAMETER LogFilePath
+## .PARAMETER LogFilePath
 All disk actions will be saved in a csv file for admin reference.  The default location for this csv file is the user’s temp directory.  The default filename is in the following format: FslShrinkDisk 2020-04-14 19-36-19.csv
 
-### .PARAMETER PassThru
+## .PARAMETER PassThru
 Returns an object representing the item with which you are working. By default, this cmdlet does not generate any pipeline output.
 
 ### .PARAMETER ThrottleLimit
 Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
-### .PARAMETER RatioFreeSpace
+## .PARAMETER RatioFreeSpace
 
 The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05. This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
 
-### .INPUTS
+## .INPUTS
 You can pipe the path into the command which is recognised by type, you can also pipe any parameter by name. It will also take the path positionally
 
-### .OUTPUTS
+## .OUTPUTS
 This script outputs a csv file with the result of the disk processing.  It will optionally produce a custom object with the same information
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path c:\Profile_user1.vhdx
 This shrinks a single disk on the local file system
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse
 This shrinks all disks in the specified share recursively
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -IgnoreLessThanGB 3
 This shrinks all disks in the specified share recursively, except for files under 3GB in size which it ignores.
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -DeleteOlderThanDays 90
 This shrinks all disks in the specified share recursively and deletes disks which were not accessed within the last 90 days.
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
 This shrinks all disks in the specified share recursively and changes the default log file location to C:\MyLogFile.csv
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru
 
     Name:			Profile_user1.vhdx
@@ -127,17 +127,17 @@ This shrinks all disks in the specified share recursively and changes the defaul
 
 This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object as well as saving the results in a csv in the default location.
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
 This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
 This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
 
-### .EXAMPLE
+## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru IgnoreLessThanGB 3 -DeleteOlderThanDays 90 -LogFilePath C:\MyLogFile.csv -ThrottleLimit 20 -RatioFreeSpace 0.3
 This does all of the above examples, but together.
 
-### .LINK
-https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/
+## .LINK
+<https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/>
