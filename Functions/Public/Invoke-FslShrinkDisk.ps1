@@ -67,11 +67,8 @@
         .PARAMETER ThrottleLimit
         Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
-        .PARAMETER IgnoreLessThanGB
-        The disk size in GB under which the script will not process the file.
-
         .PARAMETER RatioFreeSpace
-        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05 or 5%.  This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
+        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05.  This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
 
         .INPUTS
         You can pipe the path into the command which is recognised by type, you can also pipe any parameter by name. It will also take the path positionally
