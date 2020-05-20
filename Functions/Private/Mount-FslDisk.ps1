@@ -49,9 +49,9 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
-            Write-Error "Failed to create mounting directory $mountPath"
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create mounting directory $mountPath"
             return
         }
 
@@ -66,10 +66,10 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
-            Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create junction point to $mountPath"
             return
         }
 

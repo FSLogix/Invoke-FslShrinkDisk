@@ -14,7 +14,7 @@
         Powershell version 5.x and 7 and above are supported for this script. It needs to be run as administrator due to the requirement for mounting disks to the OS where the script is run.
         This tool is multi-threaded and will take advantage of multiple CPU cores on the machine from which you run the script.  It is not advised to run more than 2x the threads of your available cores on your machine.  You could also use the number of threads to throttle the load on your storage.
         Reducing the size of a virtual hard disk is a storage intensive activity.  The activity is more in file system metadata operations than pure IOPS, so make sure your storage controllers can handle the load.  The storage load occurs on the location where the disks are stored not on the machine where the script is run from.   I advise running the script out of hours if possible, to avoid impacting other users on the storage.
-        With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.  By default the script will not run on any disk with less than 15% whitespace inside (configurable).  The script can optionally also not run on disks smaller than xGB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
+        With the intention of reducing the storage load to the minimum possible, you can configure the script to only shrink the disks where you will see the most benefit.  You can delete disks which have not been accessed in x number of days previously (configurable).  Deletion of disks is not enabled by default.  By default the script will not run on any disk with less than 5% whitespace inside (configurable).  The script can optionally also not run on disks smaller than xGB (configurable) as it’s possible that even a large % of whitespace in small disks won’t result in a large capacity reclamation, but even shrinking a small amount of capacity will cause storage load.
         The script will output a csv in the following format:
 
         "Name","DiskState","OriginalSizeGB","FinalSizeGB","SpaceSavedGB","FullName"
@@ -67,11 +67,8 @@
         .PARAMETER ThrottleLimit
         Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
-        .PARAMETER IgnoreLessThanGB
-        The disk size in GB under which the script will not process the file.
-
         .PARAMETER RatioFreeSpace
-        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05 or 5%.  This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
+        The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05.  This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
 
         .INPUTS
         You can pipe the path into the command which is recognised by type, you can also pipe any parameter by name. It will also take the path positionally
@@ -786,9 +783,9 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
-            Write-Error "Failed to create mounting directory $mountPath"
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create mounting directory $mountPath"
             return
         }
 
@@ -803,10 +800,10 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
-            Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create junction point to $mountPath"
             return
         }
 
@@ -1296,9 +1293,9 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
-            Write-Error "Failed to create mounting directory $mountPath"
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create mounting directory $mountPath"
             return
         }
 
@@ -1313,10 +1310,10 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
-            Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create junction point to $mountPath"
             return
         }
 
