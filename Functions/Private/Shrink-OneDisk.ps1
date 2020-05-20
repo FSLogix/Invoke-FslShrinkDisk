@@ -91,7 +91,7 @@ function Shrink-OneDisk {
 
         #Initial disk Mount
         try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
+            $mount = Mount-FslDisk -Path $Disk.FullName -PartitionNumber $PartitionNumber -PassThru -ErrorAction Stop
         }
         catch {
             Write-VhdOutput -DiskState 'DiskLocked'
