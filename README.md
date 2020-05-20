@@ -1,5 +1,7 @@
 [![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_apis/build/status/FSLogix.Invoke-FslShrinkDisk?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_build/latest?definitionId=1&branchName=master)
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/725c8d2481044524b331d3b207971ddf)](https://www.codacy.com/gh/FSLogix/Invoke-FslShrinkDisk?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=FSLogix/Invoke-FslShrinkDisk&amp;utm_campaign=Badge_Grade)
+
 # Invoke-FslShrinkDisk.ps1
 
 ### .SYNOPSIS
