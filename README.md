@@ -36,21 +36,21 @@ The script will output a csv in the following format:
 
 | DiskState | Meaning |
 |-----|-----|
-| Success		|		Disk has been successfully processed and shrunk |
-| Ignored		|		Disk was less than the size configured in -IgnoreLessThanGB parameter |
-| Deleted		|		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted |
-| DiskLocked	|		Disk could not be mounted due to being in use |
-| LessThan(x)%FreeInsideDisk | Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
+| Success		                | Disk has been successfully processed and shrunk |
+| Ignored		                | Disk was less than the size configured in -IgnoreLessThanGB parameter |
+| Deleted		                | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted |
+| DiskLocked	                | Disk could not be mounted due to being in use |
+| LessThan(x)%FreeInsideDisk    | Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
 
 ### Possible Error values for DiskState are as follows
 | DiskState | Meaning |
 |-----|-----|
-| FileIsNotDiskFormat		| Disk file extension was not vhd or vhdx  |
-| DiskDeletionFailed		| Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted |
-| NoPartitionInfo			| Could not get partition information for partition 1 from the disk |
-| PartitionShrinkFailed		| Failed to Shrink partition as part of the disk processing |
-| DiskShrinkFailed		    | Could not shrink Disk |
-| PartitionSizeRestoreFailed |	Failed to Restore partition as part of the disk processing |
+| FileIsNotDiskFormat		    | Disk file extension was not vhd or vhdx  |
+| DiskDeletionFailed		    | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted |
+| NoPartitionInfo			    | Could not get partition information for partition 1 from the disk |
+| PartitionShrinkFailed		    | Failed to Shrink partition as part of the disk processing |
+| DiskShrinkFailed		        | Could not shrink Disk |
+| PartitionSizeRestoreFailed    | Failed to Restore partition as part of the disk processing |
 
 If the diskstate shows an error value from the list above, manual intervention may be required to make the disk usable again.
 
@@ -61,7 +61,6 @@ If you inspect your environment you will probably see that there are a few disks
 All this oneliner does is gather the names and sizes of the virtual hard disks from your share.  To export this information to a file readable by excel, use the following replacing both < yourshare > and < yourcsvfile.csv >.  You can then open the csv file in excel.
 
     Get-ChildItem -Path <yourshare> -Filter "*.vhd*" -Recurse -File | Select-Object Name, @{n = 'SizeInGB'; e = {[math]::round($_.length/1GB,2)}} | Export-Csv -Path < yourcsvfile.csv >
-
 
 ## .NOTES
 Whilst I work for Microsoft and used to work for FSLogix, this is not officially released software from either company.  This is purely a personal project designed to help the community.  If you require support for this tool please raise an issue on the GitHub repository linked below
