@@ -14,12 +14,6 @@ function Mount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-        [System.String]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [Switch]$PassThru
     )
 
@@ -36,6 +30,18 @@ function Mount-FslDisk {
         }
         catch {
             Write-Error "Failed to mount disk $Path"
+            return
+        }
+
+        try {
+            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
+            # partition. Those created with frx.exe will just have a single Basic partition.
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+        }
+        catch {
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to read partition information for disk $Path"
             return
         }
 
@@ -58,7 +64,7 @@ function Mount-FslDisk {
         try {
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
-                PartitionNumber = $PartitionNumber
+                PartitionNumber = $partition.PartitionNumber
                 AccessPath      = $mountPath
                 ErrorAction     = 'Stop'
             }

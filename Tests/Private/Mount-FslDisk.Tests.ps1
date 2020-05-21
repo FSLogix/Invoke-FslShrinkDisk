@@ -40,6 +40,16 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             PSTypeName        = 'Microsoft.Management.Infrastructure.CimInstance#ROOT/Microsoft/Windows/Storage/MSFT_DiskImage'
         }
     }
+    Mock -CommandName Get-Partition -MockWith {
+        [pscustomobject]@{
+            PartitionNumber = 1
+            Offset          = 0
+            Type            = 'Basic'
+            Size            = 31457280000
+            PSComputerName  = $null
+            PSTypeName      = 'Microsoft.Management.Infrastructure.CimInstance#ROOT/Microsoft/Windows/Storage/MSFT_Partition'
+        }
+    }
     Context "Input" {
 
         Mock -CommandName New-Item -MockWith { $null }

@@ -748,12 +748,6 @@ function Mount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-        [System.String]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [Switch]$PassThru
     )
 
@@ -770,6 +764,18 @@ function Mount-FslDisk {
         }
         catch {
             Write-Error "Failed to mount disk $Path"
+            return
+        }
+
+        try {
+            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
+            # partition. Those created with frx.exe will just have a single Basic partition.
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+        }
+        catch {
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to read partition information for disk $Path"
             return
         }
 
@@ -792,7 +798,7 @@ function Mount-FslDisk {
         try {
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
-                PartitionNumber = $PartitionNumber
+                PartitionNumber = $partition.PartitionNumber
                 AccessPath      = $mountPath
                 ErrorAction     = 'Stop'
             }
@@ -934,11 +940,6 @@ function Shrink-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [int]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
@@ -1005,12 +1006,12 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
+        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
-            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
@@ -1043,7 +1044,7 @@ function Shrink-OneDisk {
         while ($i -le 5 -and $resize -eq $false){
 
             try {
-                Resize-Partition -DiskNumber $mount.DiskNumber -Size $targetSize -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
                 $resize = $true
             }
             catch {
@@ -1114,7 +1115,8 @@ function Shrink-OneDisk {
         #Now we need to reinflate the partition to its previous size
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
             $paramWriteVhdOutput = @{
                 DiskState    = "Success"
                 FinalSizeGB  = $finalSizeGB
@@ -1258,12 +1260,6 @@ function Mount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-        [System.String]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [Switch]$PassThru
     )
 
@@ -1280,6 +1276,18 @@ function Mount-FslDisk {
         }
         catch {
             Write-Error "Failed to mount disk $Path"
+            return
+        }
+
+        try {
+            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
+            # partition. Those created with frx.exe will just have a single Basic partition.
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+        }
+        catch {
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to read partition information for disk $Path"
             return
         }
 
@@ -1302,7 +1310,7 @@ function Mount-FslDisk {
         try {
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
-                PartitionNumber = $PartitionNumber
+                PartitionNumber = $partition.PartitionNumber
                 AccessPath      = $mountPath
                 ErrorAction     = 'Stop'
             }
@@ -1442,11 +1450,6 @@ function Shrink-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [int]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
@@ -1513,12 +1516,12 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
+        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
-            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
@@ -1551,7 +1554,7 @@ function Shrink-OneDisk {
         while ($i -le 5 -and $resize -eq $false){
 
             try {
-                Resize-Partition -DiskNumber $mount.DiskNumber -Size $targetSize -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
                 $resize = $true
             }
             catch {
@@ -1622,7 +1625,8 @@ function Shrink-OneDisk {
         #Now we need to reinflate the partition to its previous size
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
             $paramWriteVhdOutput = @{
                 DiskState    = "Success"
                 FinalSizeGB  = $finalSizeGB
