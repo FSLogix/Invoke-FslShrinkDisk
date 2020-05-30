@@ -49,7 +49,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Takes input via param" {
@@ -67,7 +66,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
-                Partition           = 1
             }
             $notdisk | Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
@@ -79,7 +77,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
-                Partition           = 1
             }
             $pipeShrinkOneDisk | Shrink-OneDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
@@ -101,7 +98,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
 
@@ -118,7 +114,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when not disk" {
@@ -134,7 +129,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = 5
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output disk is too small" {
@@ -152,7 +146,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when disk is Locked" {
@@ -173,7 +166,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when No Partition" -Skip {
@@ -191,7 +183,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when Shrink Partition Fail" -Skip {
@@ -207,7 +198,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.5
-            Partition           = 1
         }
 
         It "Gives right output when No Partition Space" -Skip {
@@ -226,7 +216,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when Shrink Disk Fail" -Skip {
@@ -245,7 +234,6 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
             IgnoreLessThanGB    = $IgnoreLessThanGB
             LogFilePath         = $LogFilePath
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when estore Partition size Fail" -Skip {
@@ -260,9 +248,7 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
         $paramShrinkOneDisk = @{
             DeleteOlderThanDays = $DeleteOlderThanDays
             IgnoreLessThanGB    = $IgnoreLessThanGB
-
             RatioFreeSpace      = 0.2
-            Partition           = 1
         }
 
         It "Gives right output when Shink Successful" -Skip {

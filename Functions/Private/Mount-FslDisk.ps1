@@ -14,12 +14,6 @@ function Mount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        # FSLogix Disk Partition number is 1, vhd(x)s created with MS tools have their main partition number as 2
-        [System.String]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [Switch]$PassThru
     )
 
@@ -39,6 +33,18 @@ function Mount-FslDisk {
             return
         }
 
+        try {
+            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
+            # partition. Those created with frx.exe will just have a single Basic partition.
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+        }
+        catch {
+            # Cleanup
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to read partition information for disk $Path"
+            return
+        }
+
         # Assign vhd to a random path in temp folder so we don't have to worry about free drive letters which can be horrible
         # New-Guid not used here for PoSh 3 compatibility
         $tempGUID = [guid]::NewGuid().ToString()
@@ -49,16 +55,16 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
-            Write-Error "Failed to create mounting directory $mountPath"
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create mounting directory $mountPath"
             return
         }
 
         try {
             $addPartitionAccessPathParams = @{
                 DiskNumber      = $mountedDisk.Number
-                PartitionNumber = $PartitionNumber
+                PartitionNumber = $partition.PartitionNumber
                 AccessPath      = $mountPath
                 ErrorAction     = 'Stop'
             }
@@ -66,10 +72,10 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
-            Write-Error "Failed to create junction point to $mountPath"
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            Write-Error "Failed to create junction point to $mountPath"
             return
         }
 

@@ -1,6 +1,14 @@
+# Visual Studio Code project files
+.vscode
+
+# Development environment
 start.ps1
 notes.txt
 Setup.ps1
 StartSOD.ps1
 build.ps1
 Startmount.ps1
+
+# Test results
+CodeCoverage.xml
+PesterTest.xml

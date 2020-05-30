@@ -27,11 +27,6 @@ function Shrink-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [int]$PartitionNumber = 1,
-
-        [Parameter(
-            ValuefromPipelineByPropertyName = $true
-        )]
         [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
@@ -98,12 +93,12 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber
+        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
-            $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -ErrorAction Stop
+            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
@@ -136,7 +131,7 @@ function Shrink-OneDisk {
         while ($i -le 5 -and $resize -eq $false){
 
             try {
-                Resize-Partition -DiskNumber $mount.DiskNumber -Size $targetSize -PartitionNumber $PartitionNumber -ErrorAction Stop
+                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
                 $resize = $true
             }
             catch {
@@ -207,7 +202,8 @@ function Shrink-OneDisk {
         #Now we need to reinflate the partition to its previous size
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-            Resize-Partition -DiskNumber $mount.DiskNumber -Size $sizeMax -PartitionNumber $PartitionNumber -ErrorAction Stop
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
             $paramWriteVhdOutput = @{
                 DiskState    = "Success"
                 FinalSizeGB  = $finalSizeGB
