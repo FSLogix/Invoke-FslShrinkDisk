@@ -36,7 +36,7 @@ function Mount-FslDisk {
         try {
             # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
             # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq-Value 'Basic'
         }
         catch {
             # Cleanup
