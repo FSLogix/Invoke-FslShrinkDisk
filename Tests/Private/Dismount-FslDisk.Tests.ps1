@@ -6,13 +6,19 @@ $here = $here | Split-Path -Parent | Split-Path -Parent
 
 Describe "Describing $($sut.Trimend('.ps1'))" {
 
-    $Path = 'Testdrive:\NotPath'
-    $imPath = 'Testdrive:\NotImage'
+    BeforeAll{
+        $Path = 'Testdrive:\NotPath'
+        $imPath = 'Testdrive:\NotImage'
+    }
+
 
     Context "Input" {
+        BeforeAll {
+            Mock -CommandName Dismount-DiskImage -MockWith { $null }
+            Mock -CommandName Remove-Item -MockWith { $null }
+        }
 
-        Mock -CommandName Dismount-DiskImage -MockWith { $null }
-        Mock -CommandName Remove-Item -MockWith { $null }
+
 
         It "Takes input via param" {
             Dismount-FslDisk -Path $Path -ImagePath $imPath -ErrorAction Stop | Should -BeNullOrEmpty
@@ -35,15 +41,16 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
     }
 
     Context "Function Logic" {
+        BeforeAll {
+            Mock -CommandName Dismount-DiskImage -MockWith { $null }
+            Mock -CommandName Remove-Item -MockWith { $null }
 
-        Mock -CommandName Dismount-DiskImage -MockWith { $null }
-        Mock -CommandName Remove-Item -MockWith { $null }
-
-        $param = @{
-            Path        = $Path
-            ImagePath   = $imPath
-            Passthru    = $true
-            ErrorAction = 'Stop'
+            $param = @{
+                Path        = $Path
+                ImagePath   = $imPath
+                Passthru    = $true
+                ErrorAction = 'Stop'
+            }
         }
 
         It "It Reports Mount removed as true" {
@@ -63,14 +70,16 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
 
     Context "Output error Directory" {
 
-        Mock -CommandName Dismount-DiskImage -MockWith { $null }
-        Mock -CommandName Remove-Item -MockWith { Write-Error 'RemoveMock' }
+        BeforeAll {
+            Mock -CommandName Dismount-DiskImage -MockWith { $null }
+            Mock -CommandName Remove-Item -MockWith { Write-Error 'RemoveMock' }
 
-        $param = @{
-            Path        = $Path
-            ImagePath   = $imPath
-            Passthru    = $true
-            ErrorAction = 'SilentlyContinue'
+            $param = @{
+                Path        = $Path
+                ImagePath   = $imPath
+                Passthru    = $true
+                ErrorAction = 'SilentlyContinue'
+            }
         }
 
         It "It Reports Directory removed as false" {
@@ -80,14 +89,16 @@ Describe "Describing $($sut.Trimend('.ps1'))" {
 
     Context "Output error Mount" {
 
-        Mock -CommandName Dismount-DiskImage -MockWith { Write-Error 'DismountMock' }
-        Mock -CommandName Remove-Item -MockWith { $null }
+        BeforeAll {
+            Mock -CommandName Dismount-DiskImage -MockWith { Write-Error 'DismountMock' }
+            Mock -CommandName Remove-Item -MockWith { $null }
 
-        $param = @{
-            Path        = $Path
-            ImagePath   = $imPath
-            Passthru    = $true
-            ErrorAction = 'SilentlyContinue'
+            $param = @{
+                Path        = $Path
+                ImagePath   = $imPath
+                Passthru    = $true
+                ErrorAction = 'SilentlyContinue'
+            }
         }
 
         It "It Reports Mount removed as false" {
