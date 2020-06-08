@@ -1,8 +1,11 @@
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$funcType = Split-Path $here -Leaf
-$sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
-$here = $here | Split-Path -Parent | Split-Path -Parent
-. "$here\Functions\$funcType\$sut"
+BeforeAll {
+
+    $here = Split-Path -Parent $PSCommandPath
+    $funcType = Split-Path $here -Leaf
+    $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'
+    $here = $here | Split-Path -Parent | Split-Path -Parent
+    . "$here\Functions\$funcType\$sut"
+}
 
 Describe "Describing $($sut.Trimend('.ps1'))" {
 

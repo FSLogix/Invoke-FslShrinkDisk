@@ -1,18 +1,23 @@
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$funcType = Split-Path $here -Leaf
-$sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
-$here = $here | Split-Path -Parent | Split-Path -Parent
-. "$here\Functions\$funcType\$sut"
+BeforeAll {
+    $here = Split-Path -Parent $PSCommandPath
+    $funcType = Split-Path $here -Leaf
+    $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'
+    $here = $here | Split-Path -Parent | Split-Path -Parent
+    . "$here\Functions\$funcType\$sut"
 
-#Import functions so they can be used or mocked
-. "$here\Functions\Private\Write-VhdOutput.ps1"
-. "$here\Functions\Private\Mount-FslDisk.ps1"
-. "$here\Functions\Private\Dismount-FslDisk.ps1"
+    #Import functions so they can be used or mocked
+    . "$here\Functions\Private\Write-VhdOutput.ps1"
+    . "$here\Functions\Private\Mount-FslDisk.ps1"
+    . "$here\Functions\Private\Dismount-FslDisk.ps1"
 
-#Adding enpty function so that the mock works
-function invoke-diskpart ($Path) {
+    #Adding enpty function so that the mock works
+    function invoke-diskpart ($Path) {
+
+    }
 
 }
+
+
 
 Describe "Describing $($sut.Trimend('.ps1'))" {
 
