@@ -7,7 +7,7 @@ BeforeAll {
     . "$here\Functions\$funcType\$sut"
 }
 
-Describe "Describing $($sut.Trimend('.ps1'))" {
+Describe "Describing Write-VhdOutput" {
 
     It "Does not error" {
 

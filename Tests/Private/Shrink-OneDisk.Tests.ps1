@@ -19,7 +19,7 @@ BeforeAll {
 
 
 
-Describe "Describing $($sut.Trimend('.ps1'))" {
+Describe "Describing Shrink-OneDisk" {
 
     BeforeAll {
         $disk = New-Item testdrive:\fakedisk.vhdx | Get-ChildItem
