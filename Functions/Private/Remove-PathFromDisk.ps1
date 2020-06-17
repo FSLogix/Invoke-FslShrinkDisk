@@ -3,11 +3,14 @@ function Remove-PathFromDisk {
 
     Param (
         [Parameter(
-            ValuefromPipelineByPropertyName = $true
+            ParameterSetName = 'Custom',
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
         )]
-        [System.String]$CustomPath,
+        [System.String[]]$CustomPath,
 
         [Parameter(
+            ParameterSetName = 'Office',
             ValuefromPipelineByPropertyName = $true
         )]
         [ValidateSet("All", "Outlook", "Activation", "FileCache", "OneDrive", "OneNote", "OneNote_UWP", "OutlookPersonalization", "SharePoint", "Skype", "Teams")]
@@ -19,22 +22,42 @@ function Remove-PathFromDisk {
     } # Begin
     PROCESS {
 
-        foreach ($part in $OfficeComponent) {
+        switch ($PSCmdlet.ParameterSetName) {
+            'Office' {
+                if ($OfficeComponent -contains "All") {
+                    $OfficeComponent = @("Outlook", "Activation", "FileCache", "OneDrive", "OneNote", "OneNote_UWP", "OutlookPersonalization", "SharePoint", "Skype", "Teams")
+                }
 
-            switch ($part) {
-                "Outlook" { Remove-PathFromDisk -CustomPath ; break }
-                "Activation" { Remove-PathFromDisk -CustomPath ; break }
-                "FileCache" { Remove-PathFromDisk -CustomPath ; break }
-                "OneDrive" { Remove-PathFromDisk -CustomPath ; break }
-                "OneNote" { Remove-PathFromDisk -CustomPath ; break }
-                "OneNote_UWP" { Remove-PathFromDisk -CustomPath ; break }
-                "OutlookPersonalization" { Remove-PathFromDisk -CustomPath ; break }
-                "SharePoint" { Remove-PathFromDisk -CustomPath ; break }
-                "Skype" { Remove-PathFromDisk -CustomPath ; break }
-                "Teams" { Remove-PathFromDisk -CustomPath ; break }
-                Default { }
+                foreach ($part in $OfficeComponent) {
+                    switch ($part) {
+                        "Outlook" { Remove-PathFromDisk -CustomPath ; break }
+                        "Activation" { Remove-PathFromDisk -CustomPath ; break }
+                        "FileCache" { Remove-PathFromDisk -CustomPath ; break }
+                        "OneDrive" { Remove-PathFromDisk -CustomPath ; break }
+                        "OneNote" { Remove-PathFromDisk -CustomPath ; break }
+                        "OneNote_UWP" { Remove-PathFromDisk -CustomPath ; break }
+                        "OutlookPersonalization" { Remove-PathFromDisk -CustomPath ; break }
+                        "SharePoint" { Remove-PathFromDisk -CustomPath ; break }
+                        "Skype" { Remove-PathFromDisk -CustomPath ; break }
+                        "Teams" { Remove-PathFromDisk -CustomPath ; break }
+                        Default { }
+                    }
+                }
             }
+            'Custom' {
+                foreach ($path in $CustomPath) {
+                    try {
+                        Remove-Item -Path $path -Force -Confirm:$false
+                    }
+                    catch {
+                        Write-Warning "Failed to delete $path"
+                    }
+
+                }
+            }
+            Default {}
         }
+
     } #Process
     END { } #End
 }  #function

@@ -112,7 +112,7 @@
 
         .EXAMPLE
         C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -RatioFreeSpace 0.3
-	    This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
+	    This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 5%.
 
         .LINK
         https://github.com/FSLogix/Invoke-FslShrinkDisk/
