@@ -763,19 +763,21 @@ function Mount-FslDisk {
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
-            Write-Error "Failed to mount disk $Path"
+            $e = $error[0]
+            Write-Error "Failed to mount disk - `"$e`""
             return
         }
 
         try {
             # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
             # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to read partition information for disk $Path"
+            Write-Error "Failed to read partition information for disk - `"$e`""
             return
         }
 
@@ -789,9 +791,10 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create mounting directory $mountPath"
+            Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
 
@@ -806,10 +809,11 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
+            $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create junction point to $mountPath"
+            Write-Error "Failed to create junction point to - `"$e`""
             return
         }
 
@@ -952,6 +956,7 @@ function Shrink-OneDisk {
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
+        $hyperv = $false
     } # Begin
     PROCESS {
         #Grab size of disk being porcessed
@@ -1002,7 +1007,8 @@ function Shrink-OneDisk {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
         }
         catch {
-            Write-VhdOutput -DiskState 'DiskLocked'
+            $diskError = $error[0]
+            Write-VhdOutput -DiskState $diskError.exception.message
             return
         }
 
@@ -1020,6 +1026,8 @@ function Shrink-OneDisk {
             return
         }
 
+
+
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
@@ -1035,35 +1043,39 @@ function Shrink-OneDisk {
             return
         }
 
-        #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
-        $i = 0
-        $resize = $false
-        $targetSize = $partitionsize.SizeMin
-        $sizeBytesIncrement = 100 * 1024 * 1024
+        if ($hyperv -eq $true) {
 
-        while ($i -le 5 -and $resize -eq $false){
+            #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
+            $i = 0
+            $resize = $false
+            $targetSize = $partitionsize.SizeMin
+            $sizeBytesIncrement = 100 * 1024 * 1024
 
-            try {
-                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
-                $resize = $true
+            while ($i -le 5 -and $resize -eq $false) {
+
+                try {
+                    Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
+                    $resize = $true
+                }
+                catch {
+                    $resize = $false
+                    $targetSize = $targetSize + $sizeBytesIncrement
+                    $i++
+                }
+                finally {
+                    Start-Sleep 1
+                }
             }
-            catch {
-                $resize = $false
-                $targetSize = $targetSize + $sizeBytesIncrement
-                $i++
-            }
-            finally{
-                Start-Sleep 1
+
+            #Whatever happens now we need to dismount
+
+            if ($resize -eq $false) {
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                $mount | DisMount-FslDisk
+                return
             }
         }
 
-        #Whatever happens now we need to dismount
-
-        if ($resize -eq $false){
-            Write-VhdOutput -DiskState "PartitionShrinkFailed"
-            $mount | DisMount-FslDisk
-            return
-        }
 
         $mount | DisMount-FslDisk
 
@@ -1083,8 +1095,10 @@ function Shrink-OneDisk {
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
                 #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
-                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
+                Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
+                Add-Content -Path $Path -Value 'detach vdisk'
                 $result = DISKPART /s $Path
                 Write-Output $result
             }
@@ -1093,7 +1107,7 @@ function Shrink-OneDisk {
 
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
-                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
                 $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
@@ -1112,24 +1126,26 @@ function Shrink-OneDisk {
             return
         }
 
-        #Now we need to reinflate the partition to its previous size
-        try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
-            $paramWriteVhdOutput = @{
-                DiskState    = "Success"
-                FinalSizeGB  = $finalSizeGB
-                SpaceSavedGB = $originalSizeGB - $finalSizeGB
+        if ($hyperv -eq $true) {
+            #Now we need to reinflate the partition to its previous size
+            try {
+                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
+                $paramWriteVhdOutput = @{
+                    DiskState    = "Success"
+                    FinalSizeGB  = $finalSizeGB
+                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
+                }
+                Write-VhdOutput @paramWriteVhdOutput
             }
-            Write-VhdOutput @paramWriteVhdOutput
-        }
-        catch {
-            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
-            return
-        }
-        finally {
-            $mount | DisMount-FslDisk
+            catch {
+                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+                return
+            }
+            finally {
+                $mount | DisMount-FslDisk
+            }
         }
     } #Process
     END { } #End
@@ -1227,7 +1243,7 @@ PROCESS {
 
     #Get a list of Virtual Hard Disk files depending on the recurse parameter
     if ($Recurse) {
-        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
+        $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path -Recurse
     }
     else {
         $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
@@ -1275,19 +1291,21 @@ function Mount-FslDisk {
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
-            Write-Error "Failed to mount disk $Path"
+            $e = $error[0]
+            Write-Error "Failed to mount disk - `"$e`""
             return
         }
 
         try {
             # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
             # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to read partition information for disk $Path"
+            Write-Error "Failed to read partition information for disk - `"$e`""
             return
         }
 
@@ -1301,9 +1319,10 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create mounting directory $mountPath"
+            Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
 
@@ -1318,10 +1337,11 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
+            $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create junction point to $mountPath"
+            Write-Error "Failed to create junction point to - `"$e`""
             return
         }
 
@@ -1462,6 +1482,7 @@ function Shrink-OneDisk {
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
+        $hyperv = $false
     } # Begin
     PROCESS {
         #Grab size of disk being porcessed
@@ -1512,7 +1533,8 @@ function Shrink-OneDisk {
             $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
         }
         catch {
-            Write-VhdOutput -DiskState 'DiskLocked'
+            $diskError = $error[0]
+            Write-VhdOutput -DiskState $diskError.exception.message
             return
         }
 
@@ -1530,6 +1552,8 @@ function Shrink-OneDisk {
             return
         }
 
+
+
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
@@ -1545,35 +1569,39 @@ function Shrink-OneDisk {
             return
         }
 
-        #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
-        $i = 0
-        $resize = $false
-        $targetSize = $partitionsize.SizeMin
-        $sizeBytesIncrement = 100 * 1024 * 1024
+        if ($hyperv -eq $true) {
 
-        while ($i -le 5 -and $resize -eq $false){
+            #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
+            $i = 0
+            $resize = $false
+            $targetSize = $partitionsize.SizeMin
+            $sizeBytesIncrement = 100 * 1024 * 1024
 
-            try {
-                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
-                $resize = $true
+            while ($i -le 5 -and $resize -eq $false) {
+
+                try {
+                    Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
+                    $resize = $true
+                }
+                catch {
+                    $resize = $false
+                    $targetSize = $targetSize + $sizeBytesIncrement
+                    $i++
+                }
+                finally {
+                    Start-Sleep 1
+                }
             }
-            catch {
-                $resize = $false
-                $targetSize = $targetSize + $sizeBytesIncrement
-                $i++
-            }
-            finally{
-                Start-Sleep 1
+
+            #Whatever happens now we need to dismount
+
+            if ($resize -eq $false) {
+                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                $mount | DisMount-FslDisk
+                return
             }
         }
 
-        #Whatever happens now we need to dismount
-
-        if ($resize -eq $false){
-            Write-VhdOutput -DiskState "PartitionShrinkFailed"
-            $mount | DisMount-FslDisk
-            return
-        }
 
         $mount | DisMount-FslDisk
 
@@ -1593,8 +1621,10 @@ function Shrink-OneDisk {
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
                 #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
-                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
+                Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
+                Add-Content -Path $Path -Value 'detach vdisk'
                 $result = DISKPART /s $Path
                 Write-Output $result
             }
@@ -1603,7 +1633,7 @@ function Shrink-OneDisk {
 
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
-                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -Expandproperty Length
+                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
                 $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
@@ -1622,24 +1652,26 @@ function Shrink-OneDisk {
             return
         }
 
-        #Now we need to reinflate the partition to its previous size
-        try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
-            $paramWriteVhdOutput = @{
-                DiskState    = "Success"
-                FinalSizeGB  = $finalSizeGB
-                SpaceSavedGB = $originalSizeGB - $finalSizeGB
+        if ($hyperv -eq $true) {
+            #Now we need to reinflate the partition to its previous size
+            try {
+                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
+                $paramWriteVhdOutput = @{
+                    DiskState    = "Success"
+                    FinalSizeGB  = $finalSizeGB
+                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
+                }
+                Write-VhdOutput @paramWriteVhdOutput
             }
-            Write-VhdOutput @paramWriteVhdOutput
-        }
-        catch {
-            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
-            return
-        }
-        finally {
-            $mount | DisMount-FslDisk
+            catch {
+                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+                return
+            }
+            finally {
+                $mount | DisMount-FslDisk
+            }
         }
     } #Process
     END { } #End
