@@ -1147,6 +1147,8 @@ function Shrink-OneDisk {
                 $mount | DisMount-FslDisk
             }
         }
+
+        Write-VhdOutput @paramWriteVhdOutput
     } #Process
     END { } #End
 }  #function Shrink-OneDisk
@@ -1673,6 +1675,8 @@ function Shrink-OneDisk {
                 $mount | DisMount-FslDisk
             }
         }
+
+        Write-VhdOutput @paramWriteVhdOutput
     } #Process
     END { } #End
 }  #function Shrink-OneDisk
