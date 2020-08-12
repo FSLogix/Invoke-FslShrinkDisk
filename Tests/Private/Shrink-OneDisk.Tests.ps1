@@ -150,7 +150,8 @@ Describe "Describing Shrink-OneDisk" {
     Context "Locked" {
 
         It "Gives right output when disk is Locked" {
-            Mock -CommandName Mount-FslDisk -MockWith { Write-Error 'Disk in use' }
+            $errtxt = 'Disk in use'
+            Mock -CommandName Mount-FslDisk -MockWith { Write-Error $errtxt }
 
             $paramShrinkOneDisk = @{
                 Disk                = $Disk
@@ -159,7 +160,7 @@ Describe "Describing Shrink-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskLocked'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be $errtxt
         }
     }
 
