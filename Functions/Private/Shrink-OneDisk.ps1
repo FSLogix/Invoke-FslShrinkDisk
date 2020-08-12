@@ -178,7 +178,7 @@ function Shrink-OneDisk {
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
                 #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
-                Set-Content -Path $Path -Value "SELECT VDISK FILE=$($Disk.FullName)"
+                Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
                 Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
                 Add-Content -Path $Path -Value 'detach vdisk'
