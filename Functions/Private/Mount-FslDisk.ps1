@@ -29,7 +29,8 @@ function Mount-FslDisk {
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
-            Write-Error "Failed to mount disk $Path"
+            $e = $error[0]
+            Write-Error "Failed to mount disk - `"$e`""
             return
         }
 
@@ -39,9 +40,10 @@ function Mount-FslDisk {
             $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to read partition information for disk $Path"
+            Write-Error "Failed to read partition information for disk - `"$e`""
             return
         }
 
@@ -55,9 +57,10 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
+            $e = $error[0]
             # Cleanup
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create mounting directory $mountPath"
+            Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
 
@@ -72,10 +75,11 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
+            $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create junction point to $mountPath"
+            Write-Error "Failed to create junction point to - `"$e`""
             return
         }
 

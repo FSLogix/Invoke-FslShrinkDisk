@@ -197,7 +197,7 @@ PROCESS {
 
     #Get a list of Virtual Hard Disk files depending on the recurse parameter
     if ($Recurse) {
-        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path -Recurse
+        $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path -Recurse
     }
     else {
         $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
