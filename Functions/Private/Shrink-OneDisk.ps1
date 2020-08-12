@@ -110,7 +110,6 @@ function Shrink-OneDisk {
         }
 
 
-
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
@@ -126,6 +125,7 @@ function Shrink-OneDisk {
             return
         }
 
+        #If I decide to add Hyper-V module support, I'll need this code later
         if ($hyperv -eq $true) {
 
             #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
@@ -158,7 +158,6 @@ function Shrink-OneDisk {
                 return
             }
         }
-
 
         $mount | DisMount-FslDisk
 
@@ -209,6 +208,7 @@ function Shrink-OneDisk {
             return
         }
 
+        #If I decide to add Hyper-V module support, I'll need this code later
         if ($hyperv -eq $true) {
             #Now we need to reinflate the partition to its previous size
             try {
