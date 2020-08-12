@@ -231,6 +231,11 @@ function Shrink-OneDisk {
             }
         }
 
+        $paramWriteVhdOutput = @{
+            DiskState    = "Success"
+            FinalSizeGB  = $finalSizeGB
+            SpaceSavedGB = $originalSizeGB - $finalSizeGB
+        }
         Write-VhdOutput @paramWriteVhdOutput
     } #Process
     END { } #End
