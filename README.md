@@ -2,7 +2,7 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/725c8d2481044524b331d3b207971ddf)](https://www.codacy.com/gh/FSLogix/Invoke-FslShrinkDisk?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=FSLogix/Invoke-FslShrinkDisk&amp;utm_campaign=Badge_Grade)
 
-# Invoke-FslShrinkDisk.ps1
+# Optimize-FslDisk.ps1
 
 ## .SYNOPSIS
 Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
@@ -97,27 +97,27 @@ You can pipe the path into the command which is recognised by type, you can also
 This script outputs a csv file with the result of the disk processing.  It will optionally produce a custom object with the same information
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path c:\Profile_user1.vhdx
+    C:\PS> Optimize-FslDisk.ps1 -Path c:\Profile_user1.vhdx
 This shrinks a single disk on the local file system
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse
 This shrinks all disks in the specified share recursively
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -IgnoreLessThanGB 3
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -IgnoreLessThanGB 3
 This shrinks all disks in the specified share recursively, except for files under 3GB in size which it ignores.
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -DeleteOlderThanDays 90
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -DeleteOlderThanDays 90
 This shrinks all disks in the specified share recursively and deletes disks which were not accessed within the last 90 days.
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
 This shrinks all disks in the specified share recursively and changes the default log file location to C:\MyLogFile.csv
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -PassThru
 
     Name:			Profile_user1.vhdx
     DiskState:		Success
@@ -129,16 +129,16 @@ This shrinks all disks in the specified share recursively and changes the defaul
 This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object as well as saving the results in a csv in the default location.
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
 This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
 This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
 
 ## .EXAMPLE
-    C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -PassThru IgnoreLessThanGB 3 -DeleteOlderThanDays 90 -LogFilePath C:\MyLogFile.csv -ThrottleLimit 20 -RatioFreeSpace 0.3
+    C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -PassThru IgnoreLessThanGB 3 -DeleteOlderThanDays 90 -LogFilePath C:\MyLogFile.csv -ThrottleLimit 20 -RatioFreeSpace 0.3
 This does all of the above examples, but together.
 
 ## .LINK
-<https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/>
+<https://github.com/FSLogix/Optimize-FslDisk.ps1/>

@@ -77,27 +77,27 @@
         This script outputs a csv file with the result of the disk processing.  It will optionally produce a custom object with the same information
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path c:\Profile_user1.vhdx
+        C:\PS> Optimize-FslDisk.ps1 -Path c:\Profile_user1.vhdx
 	    This shrinks a single disk on the local file system
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse
 	    This shrinks all disks in the specified share recursively
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -IgnoreLessThanGB 3
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -IgnoreLessThanGB 3
         This shrinks all disks in the specified share recursively, except for files under 3GB in size which it ignores.
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -DeleteOlderThanDays 90
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -DeleteOlderThanDays 90
         This shrinks all disks in the specified share recursively and deletes disks which were not accessed within the last 90 days.
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -LogFilePath C:\MyLogFile.csv
         This shrinks all disks in the specified share recursively and changes the default log file location to C:\MyLogFile.csv
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -PassThru
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -PassThru
         Name:			Profile_user1.vhdx
         DiskState:		Success
         OriginalSizeGB:		4.35
@@ -107,15 +107,15 @@
         This shrinks all disks in the specified share recursively and passes the result of the disk processing to the pipeline as an object.
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -ThrottleLimit 20
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
         This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
 
         .EXAMPLE
-        C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -RatioFreeSpace 0.3
+        C:\PS> Optimize-FslDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
 	    This shrinks all disks in the specified share recursively while not processing disks which have less than 30% whitespace instead of the default 15%.
 
         .LINK
-        https://github.com/FSLogix/Invoke-FslShrinkDisk/
+        https://github.com/FSLogix/Optimize-FslDisk.ps1/
 
     #>
 
@@ -180,8 +180,8 @@ BEGIN {
     #Dismount-FslDisk
     . .\Functions\Private\Dismount-FslDisk.ps1
 
-    #Shrink-OneDisk
-    . .\Functions\Private\Shrink-OneDisk.ps1
+    #Optimize-OneDisk
+    . .\Functions\Private\Optimize-OneDisk.ps1
 
     #Write Output to file and optionally to pipeline
     . .\Functions\Private\Write-VhdOutput.ps1
@@ -217,8 +217,8 @@ PROCESS {
         . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
         . .\Functions\Private\Dismount-FslDisk.ps1
-        #Shrink-OneDisk
-        . .\Functions\Private\Shrink-OneDisk.ps1
+        #Optimize-OneDisk
+        . .\Functions\Private\Optimize-OneDisk.ps1
         #Write Output to file and optionally to pipeline
         . .\Functions\Private\Write-VhdOutput.ps1
 
@@ -230,7 +230,7 @@ PROCESS {
             PassThru            = $using:PassThru
             RatioFreeSpace      = $using:RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramShrinkOneDisk
 
     } #Scriptblock
 
@@ -246,7 +246,7 @@ PROCESS {
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramShrinkOneDisk
 
     } #Scriptblock
 

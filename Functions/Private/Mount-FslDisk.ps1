@@ -26,7 +26,7 @@ function Mount-FslDisk {
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
             # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage -ErrorAction Stop
         }
         catch {
             $e = $error[0]
@@ -34,10 +34,28 @@ function Mount-FslDisk {
             return
         }
 
+        if (-not $mountedDisk.Number) {
+            $timespan = (Get-Date).AddSeconds(10)
+            $imageinfo = $false
+            while (Get-Date -lt $timespan -and $imageinfo -eq $false) {
+                Start-Sleep 0.1
+                $mountedDisk = Get-DiskImage -ImagePath $Path -ErrorAction SilentlyContinue
+                if ($mountedDisk.Number){
+                    $imageinfo = $true
+                }
+            }
+        }
+
+        if (-not $mountedDisk.Number) {
+            Write-Error "Failed to get DiskNumber"
+            return
+        }
+
         try {
             # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
             # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
+            $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
+            $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
         }
         catch {
             $e = $error[0]
@@ -79,7 +97,7 @@ function Mount-FslDisk {
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to create junction point to - `"$e`""
+            Write-Error "Failed to create junction point - `"$e`""
             return
         }
 
