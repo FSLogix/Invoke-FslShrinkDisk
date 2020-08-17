@@ -32,7 +32,7 @@
         FileIsNotDiskFormat		Disk file extension was not vhd or vhdx
         DiskDeletionFailed		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted
         NoPartitionInfo			Could not get partition information for partition 1 from the disk
-        PartitionShrinkFailed		Failed to Shrink partition as part of the disk processing
+        PartitionShrinkFailed		Failed to Optimize partition as part of the disk processing
         DiskShrinkFailed		Could not shrink Disk
         PartitionSizeRestoreFailed 	Failed to Restore partition as part of the disk processing
 
@@ -180,8 +180,8 @@ BEGIN {
     #Dismount-FslDisk
     . .\Functions\Private\Dismount-FslDisk.ps1
 
-    #Shrink-OneDisk
-    . .\Functions\Private\Shrink-OneDisk.ps1
+    #Optimize-OneDisk
+    . .\Functions\Private\Optimize-OneDisk.ps1
 
     #Write Output to file and optionally to pipeline
     . .\Functions\Private\Write-VhdOutput.ps1
@@ -217,12 +217,12 @@ PROCESS {
         . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
         . .\Functions\Private\Dismount-FslDisk.ps1
-        #Shrink-OneDisk
-        . .\Functions\Private\Shrink-OneDisk.ps1
+        #Optimize-OneDisk
+        . .\Functions\Private\Optimize-OneDisk.ps1
         #Write Output to file and optionally to pipeline
         . .\Functions\Private\Write-VhdOutput.ps1
 
-        $paramShrinkOneDisk = @{
+        $paramOptimizeOneDisk = @{
             Disk                = $_
             DeleteOlderThanDays = $using:DeleteOlderThanDays
             IgnoreLessThanGB    = $using:IgnoreLessThanGB
@@ -230,7 +230,7 @@ PROCESS {
             PassThru            = $using:PassThru
             RatioFreeSpace      = $using:RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramOptimizeOneDisk
 
     } #Scriptblock
 
@@ -238,7 +238,7 @@ PROCESS {
 
         $disk = $_
 
-        $paramShrinkOneDisk = @{
+        $paramOptimizeOneDisk = @{
             Disk                = $disk
             DeleteOlderThanDays = $DeleteOlderThanDays
             IgnoreLessThanGB    = $IgnoreLessThanGB
@@ -246,7 +246,7 @@ PROCESS {
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramOptimizeOneDisk
 
     } #Scriptblock
 
