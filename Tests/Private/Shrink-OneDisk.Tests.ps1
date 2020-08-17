@@ -19,7 +19,7 @@ BeforeAll {
 
 
 
-Describe "Describing Optimize-OneDisk" {
+Describe "Describing Shrink-OneDisk" {
 
     BeforeAll {
         $disk = New-Item testdrive:\fakedisk.vhdx | Get-ChildItem
@@ -62,11 +62,11 @@ Describe "Describing Optimize-OneDisk" {
         }
 
         It "Takes input via param" {
-            Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop | Should -BeNullOrEmpty
+            Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
 
         It "Takes input via param with passthru" {
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty Name | Should -Be 'fakeextension.vhdx.txt'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty Name | Should -Be 'fakeextension.vhdx.txt'
         }
 
         It "Takes input via pipeline for disk" {
@@ -77,7 +77,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            $notdisk | Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop | Should -BeNullOrEmpty
+            $notdisk | Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
 
         It "Takes input via named pipeline" {
@@ -88,7 +88,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            $pipeShrinkOneDisk | Optimize-OneDisk -ErrorAction Stop | Should -BeNullOrEmpty
+            $pipeShrinkOneDisk | Shrink-OneDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
 
     }
@@ -113,7 +113,7 @@ Describe "Describing Optimize-OneDisk" {
         }
 
         It "Gives right output when no deletion" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskDeletionFailed'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskDeletionFailed'
         }
     }
 
@@ -128,7 +128,7 @@ Describe "Describing Optimize-OneDisk" {
                 RatioFreeSpace      = 0.2
             }
 
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'FileIsNotDiskFormat'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'FileIsNotDiskFormat'
         }
     }
 
@@ -143,7 +143,7 @@ Describe "Describing Optimize-OneDisk" {
                 RatioFreeSpace      = 0.2
             }
 
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Ignored'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Ignored'
         }
     }
 
@@ -160,7 +160,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be $errtxt
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be $errtxt
         }
     }
 
@@ -179,7 +179,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'NoPartitionInfo'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'NoPartitionInfo'
         }
     }
 
@@ -196,7 +196,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionShrinkFailed'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionShrinkFailed'
         }
     }
 
@@ -211,7 +211,7 @@ Describe "Describing Optimize-OneDisk" {
                 RatioFreeSpace      = 0.5
             }
 
-            $out = Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState
+            $out = Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState
             $out | Should -Be LessThan$(100*$paramShrinkOneDisk.RatioFreeSpace)%FreeInsideDisk
         }
     }
@@ -229,7 +229,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskShrinkFailed'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskShrinkFailed'
         }
     }
 
@@ -246,7 +246,7 @@ Describe "Describing Optimize-OneDisk" {
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionSizeRestoreFailed'
+            Shrink-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionSizeRestoreFailed'
         }
     }
 
@@ -264,17 +264,17 @@ Describe "Describing Optimize-OneDisk" {
         }
 
         It "Gives right output when Shink Successful" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
+            Shrink-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
         It "Saves correct information in a csv" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -Disk $Disk -ErrorAction Stop -LogFilePath 'TestDrive:\OutputTest.csv'
+            Shrink-OneDisk @paramShrinkOneDisk -Disk $Disk -ErrorAction Stop -LogFilePath 'TestDrive:\OutputTest.csv'
             Import-Csv 'TestDrive:\OutputTest.csv' | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
         It "Appends information in a csv" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $Disk
-            Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $NotDisk
+            Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $Disk
+            Shrink-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $NotDisk
             Import-Csv 'TestDrive:\AppendTest.csv' | Measure-Object | Select-Object -ExpandProperty Count | Should -Be 2
         }
     }

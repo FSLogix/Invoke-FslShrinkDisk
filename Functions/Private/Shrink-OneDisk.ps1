@@ -1,4 +1,4 @@
-function Optimize-OneDisk {
+function Shrink-OneDisk {
     [CmdletBinding()]
 
     Param (
@@ -239,4 +239,4 @@ function Optimize-OneDisk {
         Write-VhdOutput @paramWriteVhdOutput
     } #Process
     END { } #End
-}  #function Optimize-OneDisk
+}  #function Shrink-OneDisk
