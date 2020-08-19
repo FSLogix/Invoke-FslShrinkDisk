@@ -46,7 +46,7 @@ function Mount-FslDisk {
             }
         }
 
-        if ($number -ne $true) {
+        if (-not $mountedDisk.Number) {
             Write-Error 'Cannot get mount information'
             return
         }
