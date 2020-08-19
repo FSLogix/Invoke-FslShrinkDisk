@@ -10,7 +10,9 @@ BeforeAll {
 Describe "Describing Dismount-FslDisk" {
 
     BeforeAll{
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $Path = 'Testdrive:\NotPath'
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $imPath = 'Testdrive:\NotImage'
     }
 
@@ -48,6 +50,7 @@ Describe "Describing Dismount-FslDisk" {
             Mock -CommandName Dismount-DiskImage -MockWith { $null }
             Mock -CommandName Remove-Item -MockWith { $null }
 
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
                 Path        = $Path
                 ImagePath   = $imPath
@@ -77,6 +80,7 @@ Describe "Describing Dismount-FslDisk" {
             Mock -CommandName Dismount-DiskImage -MockWith { $null }
             Mock -CommandName Remove-Item -MockWith { Write-Error 'RemoveMock' }
 
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
                 Path        = $Path
                 ImagePath   = $imPath
@@ -96,6 +100,7 @@ Describe "Describing Dismount-FslDisk" {
             Mock -CommandName Dismount-DiskImage -MockWith { Write-Error 'DismountMock' }
             Mock -CommandName Remove-Item -MockWith { $null }
 
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
                 Path        = $Path
                 ImagePath   = $imPath
