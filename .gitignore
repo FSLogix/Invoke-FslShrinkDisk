@@ -8,7 +8,10 @@ Setup.ps1
 StartSOD.ps1
 build.ps1
 Startmount.ps1
+Pester.ps1
 
 # Test results
 CodeCoverage.xml
 PesterTest.xml
+Coverage.xml
+testResults.xml

@@ -26,7 +26,7 @@ function Mount-FslDisk {
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
             # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
             $e = $error[0]
@@ -34,33 +34,37 @@ function Mount-FslDisk {
             return
         }
 
-        if (-not $mountedDisk.Number){
-            $number = $false
-            $timespan = (Get-Date).AddSeconds(15)
-            while ($number -eq $false -and $timespan -gt (Get-Date)) {
-                Start-Sleep 0.1
-                $mountedDisk = Get-DiskImage -ImagePath $Path
-                if ($mountedDisk.Number){
-                    $number = $true
-                }
+
+        $diskNumber = $false
+        $timespan = (Get-Date).AddSeconds(15)
+        while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
+            Start-Sleep 0.1
+            $mountedDisk = Get-DiskImage -ImagePath $Path
+            if ($mountedDisk.Number) {
+                $diskNumber = $true
             }
         }
 
-        if (-not $mountedDisk.Number) {
+        if ($diskNumber -eq $false) {
+            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
             Write-Error 'Cannot get mount information'
             return
         }
 
-        try {
-            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
-            # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
+        $partitionType = $false
+        $timespan = (Get-Date).AddSeconds(15)
+        while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
+            Start-Sleep 0.1
+            $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
+            if ($allPartition.Type -contains 'Basic') {
+                $partitionType = $true
+                $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            }
         }
-        catch {
-            $e = $error[0]
-            # Cleanup
+
+        if ($partitionType -eq $false) {
             $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to read partition information for disk - `"$e`""
+            Write-Error 'Cannot get partition information'
             return
         }
 
