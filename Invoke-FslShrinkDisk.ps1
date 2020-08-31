@@ -452,8 +452,7 @@ function Invoke-Parallel {
                             $log.status = "CompletedWithErrors"
                             Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
                             foreach ($ErrorRecord in $runspace.powershell.Streams.Error) {
-                                #Write-Error -ErrorRecord $ErrorRecord
-                                $PSCmdlet.ThrowTerminatingError($ErrorRecord)
+                                Write-Error -ErrorRecord $ErrorRecord
                             }
                         }
                         else {
