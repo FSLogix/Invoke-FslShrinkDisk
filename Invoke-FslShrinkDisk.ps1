@@ -452,7 +452,8 @@ function Invoke-Parallel {
                             $log.status = "CompletedWithErrors"
                             Write-Verbose ($log | ConvertTo-Csv -Delimiter ";" -NoTypeInformation)[1]
                             foreach ($ErrorRecord in $runspace.powershell.Streams.Error) {
-                                Write-Error -ErrorRecord $ErrorRecord
+                                #Write-Error -ErrorRecord $ErrorRecord
+                                $PSCmdlet.ThrowTerminatingError($ErrorRecord)
                             }
                         }
                         else {
@@ -1012,8 +1013,23 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-        Get-Volume -Partition $partInfo | Optimize-Volume
+        try {
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            If ((Get-Service -Name defragsvc).StartType -eq "Disabled") { 
+                Set-Service -Name defragsvc -StartupType Manual
+                If ((Get-Service -Name defragsvc).StartType -eq "Manual") { Start-Service -Name defragsvc }
+                Else { throw "OptimizeDrivesServiceFailed" }
+            }
+            ElseIf ((Get-Service -Name defragsvc).Status -ne "Running") { Start-Service -Name defragsvc }
+            Else { throw "OptimizeDrivesServiceFailed" }
+
+            Get-Volume -Partition $partInfo | Optimize-Volume
+        }
+        catch {
+            Write-VhdOutput -DiskState "OptimizeDriveServiceFailed"
+            $PSCmdlet.ThrowTerminatingError($PSItem)
+            return
+        }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
@@ -1225,7 +1241,7 @@ function Write-VhdOutput {
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
             try{
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $output | Export-Csv -Path $Path -NoTypeInformation -NoClobber -Append -ErrorAction Stop
                 $success = $true
             }
             catch{
@@ -1545,8 +1561,23 @@ function Shrink-OneDisk {
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-        Get-Volume -Partition $partInfo | Optimize-Volume
+        try {
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            If ((Get-Service -Name defragsvc).StartType -eq "Disabled") { 
+                Set-Service -Name defragsvc -StartupType Manual
+                If ((Get-Service -Name defragsvc).StartType -eq "Manual") { Start-Service -Name defragsvc }
+                Else { throw "OptimizeDrivesServiceFailed" }
+            }
+            ElseIf ((Get-Service -Name defragsvc).Status -ne "Running") { Start-Service -Name defragsvc }
+            Else { throw "OptimizeDrivesServiceFailed" }
+
+            Get-Volume -Partition $partInfo | Optimize-Volume
+        }
+        catch {
+            Write-VhdOutput -DiskState "OptimizeDriveServiceFailed"
+            $PSCmdlet.ThrowTerminatingError($PSItem)
+            return
+        }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         try {
@@ -1757,7 +1788,7 @@ function Write-VhdOutput {
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
             try{
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $output | Export-Csv -Path $Path -NoTypeInformation -NoClobber -Append -ErrorAction Stop
                 $success = $true
             }
             catch{
@@ -1807,4 +1838,4 @@ function Write-VhdOutput {
     }
 
 } #Process
-END { } #End
+END { Import-Csv $LogFilePath | Format-Table -AutoSize } #End
