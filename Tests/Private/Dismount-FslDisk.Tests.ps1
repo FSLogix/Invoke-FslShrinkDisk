@@ -122,6 +122,7 @@ Describe "Describing Dismount-FslDisk" {
                 ImagePath   = $imPath
                 Passthru    = $true
                 ErrorAction = 'SilentlyContinue'
+                Timeout = 2
             }
         }
 

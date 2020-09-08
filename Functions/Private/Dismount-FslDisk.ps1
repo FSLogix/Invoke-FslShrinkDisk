@@ -19,7 +19,12 @@ function Dismount-FslDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [Switch]$PassThru
+        [Switch]$PassThru,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$Timeout = 120
     )
 
     BEGIN {
@@ -49,11 +54,11 @@ function Dismount-FslDisk {
         }
 
 
-        $timeStampDismount = (Get-Date).AddSeconds(120)
+        $timeStampDismount = (Get-Date).AddSeconds($Timeout)
         while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
             try {
                 Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                #double check disk is dismounted due to disk manager service being a pain.
+                #double/triple check disk is dismounted due to disk manager service being a pain.
 
                 try {
                     $image = Get-DiskImage -ImagePath $ImagePath -ErrorAction Stop
@@ -68,7 +73,6 @@ function Dismount-FslDisk {
                 catch {
                     $mountRemoved = $false
                 }
-
             }
             catch {
                 $mountRemoved = $false
