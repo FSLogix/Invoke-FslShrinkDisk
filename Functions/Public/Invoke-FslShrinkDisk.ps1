@@ -159,7 +159,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [int]$ThrottleLimit = 8,
+    [int]$ThrottleLimit = 4,
 
     [Parameter(
         ValuefromPipelineByPropertyName = $true
