@@ -53,7 +53,13 @@ function Dismount-FslDisk {
         while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
             try {
                 Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
-                $mountRemoved = $true
+                #double check disk is dismounted due to disk manager dervice being a pain.
+                if (-not ((Get-DiskImage -ImagePath $ImagePath).Attached)) {
+                    $mountRemoved = $true
+                }
+                else {
+                    $mountRemoved = $false
+                }
             }
             catch {
                 $mountRemoved = $false
