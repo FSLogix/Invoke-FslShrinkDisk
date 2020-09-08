@@ -84,7 +84,7 @@ All disk actions will be saved in a csv file for admin reference.  The default l
 Returns an object representing the item with which you are working. By default, this cmdlet does not generate any pipeline output.
 
 ### .PARAMETER ThrottleLimit
-Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
+Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 4.
 
 ## .PARAMETER RatioFreeSpace
 
@@ -130,7 +130,7 @@ This shrinks all disks in the specified share recursively and passes the result 
 
 ## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -ThrottleLimit 20
-This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
+This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 4.
 
 ## .EXAMPLE
     C:\PS> Invoke-FslShrinkDisk.ps1 -Path \\server\share -Recurse -RatioFreeSpace 0.3
