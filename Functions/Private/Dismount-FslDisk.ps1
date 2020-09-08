@@ -33,7 +33,7 @@ function Dismount-FslDisk {
 
         # Reverse the tasks from Mount-FslDisk
 
-        $timeStampDirectory = (Get-Date).AddSeconds(10)
+        $timeStampDirectory = (Get-Date).AddSeconds(20)
 
         while ((Get-Date) -lt $timeStampDirectory -and $directoryRemoved -ne $true) {
             try {
@@ -49,17 +49,26 @@ function Dismount-FslDisk {
         }
 
 
-        $timeStampDismount = (Get-Date).AddSeconds(30)
+        $timeStampDismount = (Get-Date).AddSeconds(120)
         while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
             try {
                 Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
                 #double check disk is dismounted due to disk manager service being a pain.
-                if (-not ((Get-DiskImage -ImagePath $ImagePath).Attached)) {
-                    $mountRemoved = $true
+
+                try {
+                    $image = Get-DiskImage -ImagePath $ImagePath -ErrorAction Stop
+
+                    switch ($image.Attached) {
+                        $null { $mountRemoved = $false ; Start-Sleep 0.1; break }
+                        $true { $mountRemoved = $false ; break}
+                        $false { $mountRemoved = $true ; break }
+                        Default { $mountRemoved = $false }
+                    }
                 }
-                else {
+                catch {
                     $mountRemoved = $false
                 }
+
             }
             catch {
                 $mountRemoved = $false
