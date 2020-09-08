@@ -773,10 +773,16 @@ function Mount-FslDisk {
         $timespan = (Get-Date).AddSeconds(15)
         while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
-            $mountedDisk = Get-DiskImage -ImagePath $Path
-            if ($mountedDisk.Number) {
-                $diskNumber = $true
+            try {
+                $mountedDisk = Get-DiskImage -ImagePath $Path
+                if ($mountedDisk.Number) {
+                    $diskNumber = $true
+                }
             }
+            catch {
+                $diskNumber = $false
+            }
+
         }
 
         if ($diskNumber -eq $false) {
@@ -1348,10 +1354,16 @@ function Mount-FslDisk {
         $timespan = (Get-Date).AddSeconds(15)
         while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
-            $mountedDisk = Get-DiskImage -ImagePath $Path
-            if ($mountedDisk.Number) {
-                $diskNumber = $true
+            try {
+                $mountedDisk = Get-DiskImage -ImagePath $Path
+                if ($mountedDisk.Number) {
+                    $diskNumber = $true
+                }
             }
+            catch {
+                $diskNumber = $false
+            }
+
         }
 
         if ($diskNumber -eq $false) {
