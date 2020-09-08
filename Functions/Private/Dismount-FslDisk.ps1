@@ -49,7 +49,7 @@ function Dismount-FslDisk {
         }
 
 
-        $timeStampDismount = (Get-Date).AddSeconds(10)
+        $timeStampDismount = (Get-Date).AddSeconds(30)
         while ((Get-Date) -lt $timeStampDismount -and $mountRemoved -ne $true) {
             try {
                 Dismount-DiskImage -ImagePath $ImagePath -ErrorAction Stop | Out-Null
