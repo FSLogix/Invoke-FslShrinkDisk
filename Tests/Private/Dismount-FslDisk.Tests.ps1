@@ -9,7 +9,7 @@ BeforeAll {
 
 Describe "Describing Dismount-FslDisk" {
 
-    BeforeAll{
+    BeforeAll {
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $Path = 'Testdrive:\NotPath'
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
@@ -21,6 +21,10 @@ Describe "Describing Dismount-FslDisk" {
         BeforeAll {
             Mock -CommandName Dismount-DiskImage -MockWith { $null }
             Mock -CommandName Remove-Item -MockWith { $null }
+            Mock -CommandName Get-DiskImage -MockWith { [PSCustomObject]@{
+                    Attached = $false
+                }
+            }
         }
 
 
@@ -39,8 +43,8 @@ Describe "Describing Dismount-FslDisk" {
 
         It "Takes input via named pipeline" {
             [PSCustomObject]@{
-                Path       = $Path
-                ImagePath  = $imPath
+                Path      = $Path
+                ImagePath = $imPath
             } | Dismount-FslDisk -ErrorAction Stop | Should -BeNullOrEmpty
         }
     }
@@ -49,6 +53,10 @@ Describe "Describing Dismount-FslDisk" {
         BeforeAll {
             Mock -CommandName Dismount-DiskImage -MockWith { $null }
             Mock -CommandName Remove-Item -MockWith { $null }
+            Mock -CommandName Get-DiskImage -MockWith { [PSCustomObject]@{
+                    Attached = $false
+                }
+            }
 
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
@@ -79,6 +87,10 @@ Describe "Describing Dismount-FslDisk" {
         BeforeAll {
             Mock -CommandName Dismount-DiskImage -MockWith { $null }
             Mock -CommandName Remove-Item -MockWith { Write-Error 'RemoveMock' }
+            Mock -CommandName Get-DiskImage -MockWith { [PSCustomObject]@{
+                    Attached = $false
+                }
+            }
 
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
@@ -99,6 +111,10 @@ Describe "Describing Dismount-FslDisk" {
         BeforeAll {
             Mock -CommandName Dismount-DiskImage -MockWith { Write-Error 'DismountMock' }
             Mock -CommandName Remove-Item -MockWith { $null }
+            Mock -CommandName Get-DiskImage -MockWith { [PSCustomObject]@{
+                    Attached = $false
+                }
+            }
 
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $param = @{
