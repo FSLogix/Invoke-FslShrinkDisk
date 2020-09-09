@@ -12,6 +12,12 @@ function Mount-FslDisk {
         [System.String]$Path,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true,
+        )]
+        [Int]$TimeOut = 30,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$PassThru
@@ -25,7 +31,6 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
@@ -36,7 +41,7 @@ function Mount-FslDisk {
 
 
         $diskNumber = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             try {
@@ -61,7 +66,7 @@ function Mount-FslDisk {
         }
 
         $partitionType = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
