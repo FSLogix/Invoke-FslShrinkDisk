@@ -20,10 +20,11 @@ Function Test-FslDependencies {
         [System.ServiceProcess.ServiceController]$InputObject
     )
     BEGIN {
-
+        #Requires -RunAsAdministrator
+        Set-StrictMode -Version Latest
     }
     PROCESS {
-        If ($PSCmdlet.ParameterSetName -eq "ServiceObject") { 
+        If ($PSCmdlet.ParameterSetName -eq "ServiceObject") {
             Test-FslDependencies -Service $InputObject.Name
             Break
         }
