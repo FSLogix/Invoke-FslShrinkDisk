@@ -13,7 +13,7 @@ function Mount-FslDisk {
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true,
-            ValuefromPipeline = $true,
+            ValuefromPipeline = $true
         )]
         [Int]$TimeOut = 30,
 

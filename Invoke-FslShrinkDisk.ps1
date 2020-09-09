@@ -746,6 +746,12 @@ function Mount-FslDisk {
         [System.String]$Path,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
+        )]
+        [Int]$TimeOut = 30,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$PassThru
@@ -759,7 +765,6 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
@@ -770,7 +775,7 @@ function Mount-FslDisk {
 
 
         $diskNumber = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             try {
@@ -786,13 +791,16 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount Disk Due to no Disknumber'
+            }
             Write-Error 'Cannot get mount information'
             return
         }
 
         $partitionType = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
@@ -803,7 +811,10 @@ function Mount-FslDisk {
         }
 
         if ($partitionType -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount disk with no partition'
+            }
             Write-Error 'Cannot get partition information'
             return
         }
@@ -820,7 +831,10 @@ function Mount-FslDisk {
         catch {
             $e = $error[0]
             # Cleanup
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no folder could be created - `"$e`""
+            }
             Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
@@ -839,7 +853,10 @@ function Mount-FslDisk {
             $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no junction point could be created - `"$e`""
+            }
             Write-Error "Failed to create junction point to - `"$e`""
             return
         }
@@ -1005,24 +1022,29 @@ function Optimize-OneDisk {
         $hyperv = $false
     } # Begin
     PROCESS {
+        $startTime = Get-Date
+        if ( $IgnoreLessThanGB ) {
+            $IgnoreLessThanBytes = $IgnoreLessThanGB * 1024 * 1024 * 1024
+        }
+
         #Grab size of disk being porcessed
-        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
+        $originalSize = $Disk.Length
 
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
-            "Write-VhdOutput:Path"           = $LogFilePath
-            "Write-VhdOutput:Name"           = $Disk.Name
-            "Write-VhdOutput:DiskState"      = $null
-            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
-            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
-            "Write-VhdOutput:SpaceSavedGB"   = 0
-            "Write-VhdOutput:FullName"       = $Disk.FullName
-            "Write-VhdOutput:Passthru"       = $Passthru
+            "Write-VhdOutput:Path"         = $LogFilePath
+            "Write-VhdOutput:StartTime"    = $startTime
+            "Write-VhdOutput:Name"         = $Disk.Name
+            "Write-VhdOutput:DiskState"    = $null
+            "Write-VhdOutput:OriginalSize" = $originalSize
+            "Write-VhdOutput:FinalSize"    = $originalSize
+            "Write-VhdOutput:FullName"     = $Disk.FullName
+            "Write-VhdOutput:Passthru"     = $Passthru
         }
 
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat' -EndTime (Get-Date)
             return
         }
 
@@ -1033,18 +1055,18 @@ function Optimize-OneDisk {
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
+                    Write-VhdOutput -DiskState "Deleted" -FinalSize 0 -EndTime (Get-Date)
                 }
                 catch {
-                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed' -EndTime (Get-Date)
                 }
                 return
             }
         }
 
-        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
-        if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-            Write-VhdOutput -DiskState 'Ignored'
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small onesBytes
+        if ( $IgnoreLessThanGB -and $originalSize -lt $IgnoreLessThanBytes ) {
+            Write-VhdOutput -DiskState 'Ignored' -EndTime (Get-Date)
             return
         }
 
@@ -1054,7 +1076,7 @@ function Optimize-OneDisk {
         }
         catch {
             $diskError = $error[0]
-            Write-VhdOutput -DiskState $diskError.exception.message
+            Write-VhdOutput -DiskState $diskError.exception.message -EndTime (Get-Date)
             return
         }
 
@@ -1067,7 +1089,7 @@ function Optimize-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            Write-VhdOutput -DiskState 'NoPartitionInfo'
+            Write-VhdOutput -DiskState 'NoPartitionInfo' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -1076,14 +1098,14 @@ function Optimize-OneDisk {
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
-            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
 
 
         if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -1116,7 +1138,7 @@ function Optimize-OneDisk {
             #Whatever happens now we need to dismount
 
             if ($resize -eq $false) {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
                 $mount | DisMount-FslDisk
                 return
             }
@@ -1139,7 +1161,7 @@ function Optimize-OneDisk {
                 #A better way would be to use optimize-vhd from the Hyper-V module,
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though, it would be a way to solve localisation issues.
                 Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
                 Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
@@ -1153,7 +1175,6 @@ function Optimize-OneDisk {
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
-                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
             }
@@ -1166,7 +1187,7 @@ function Optimize-OneDisk {
         }
 
         If ($success -ne $true) {
-            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
             Remove-Item $tempFileName
             return
         }
@@ -1179,14 +1200,14 @@ function Optimize-OneDisk {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
                 Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
                 $paramWriteVhdOutput = @{
-                    DiskState    = "Success"
-                    FinalSizeGB  = $finalSizeGB
-                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
+                    DiskState = "Success"
+                    FinalSize = $finalSize
+                    EndTime   = Get-Date
                 }
                 Write-VhdOutput @paramWriteVhdOutput
             }
             catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
                 return
             }
             finally {
@@ -1194,10 +1215,11 @@ function Optimize-OneDisk {
             }
         }
 
+
         $paramWriteVhdOutput = @{
-            DiskState    = "Success"
-            FinalSizeGB  = $finalSizeGB
-            SpaceSavedGB = $originalSizeGB - $finalSizeGB
+            DiskState = "Success"
+            FinalSize = $finalSize
+            EndTime   = Get-Date
         }
         Write-VhdOutput @paramWriteVhdOutput
     } #Process
@@ -1227,22 +1249,27 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$OriginalSizeGB,
+        [System.String]$OriginalSize,
 
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$FinalSizeGB,
-
-        [Parameter(
-            Mandatory = $true
-        )]
-        [System.String]$SpaceSavedGB,
+        [System.String]$FinalSize,
 
         [Parameter(
             Mandatory = $true
         )]
         [System.String]$FullName,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$StartTime,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$EndTime,
 
         [Parameter(
             Mandatory = $true
@@ -1255,13 +1282,17 @@ function Write-VhdOutput {
     } # Begin
     PROCESS {
 
+        #unit conversion and calculation should happen in output function
         $output = [PSCustomObject]@{
-            Name           = $Name
-            DiskState      = $DiskState
-            OriginalSizeGB = $OriginalSizeGB
-            FinalSizeGB    = $FinalSizeGB
-            SpaceSavedGB   = $SpaceSavedGB
-            FullName       = $FullName
+            Name             = $Name
+            StartTime        = $StartTime.ToLongTimeString()
+            EndTime          = $EndTime.ToLongTimeString()
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
+            DiskState        = $DiskState
+            OriginalSizeGB   = [math]::Round( $OriginalSize / 1GB, 2 )
+            FinalSizeGB      = [math]::Round( $FinalSize / 1GB, 2 )
+            SpaceSavedGB     = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
+            FullName         = $FullName
         }
 
         if ($Passthru) {
@@ -1270,11 +1301,11 @@ function Write-VhdOutput {
         $success = $False
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
-            try{
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+            try {
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation
                 $success = $true
             }
-            catch{
+            catch {
                 $retries++
             }
             Start-Sleep 1
@@ -1327,6 +1358,12 @@ function Mount-FslDisk {
         [System.String]$Path,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
+        )]
+        [Int]$TimeOut = 30,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$PassThru
@@ -1340,7 +1377,6 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
             $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
@@ -1351,7 +1387,7 @@ function Mount-FslDisk {
 
 
         $diskNumber = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             try {
@@ -1367,13 +1403,16 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount Disk Due to no Disknumber'
+            }
             Write-Error 'Cannot get mount information'
             return
         }
 
         $partitionType = $false
-        $timespan = (Get-Date).AddSeconds(15)
+        $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
             $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
@@ -1384,7 +1423,10 @@ function Mount-FslDisk {
         }
 
         if ($partitionType -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount disk with no partition'
+            }
             Write-Error 'Cannot get partition information'
             return
         }
@@ -1401,7 +1443,10 @@ function Mount-FslDisk {
         catch {
             $e = $error[0]
             # Cleanup
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no folder could be created - `"$e`""
+            }
             Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
@@ -1420,7 +1465,10 @@ function Mount-FslDisk {
             $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no junction point could be created - `"$e`""
+            }
             Write-Error "Failed to create junction point to - `"$e`""
             return
         }
@@ -1584,24 +1632,29 @@ function Optimize-OneDisk {
         $hyperv = $false
     } # Begin
     PROCESS {
+        $startTime = Get-Date
+        if ( $IgnoreLessThanGB ) {
+            $IgnoreLessThanBytes = $IgnoreLessThanGB * 1024 * 1024 * 1024
+        }
+
         #Grab size of disk being porcessed
-        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
+        $originalSize = $Disk.Length
 
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
-            "Write-VhdOutput:Path"           = $LogFilePath
-            "Write-VhdOutput:Name"           = $Disk.Name
-            "Write-VhdOutput:DiskState"      = $null
-            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
-            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
-            "Write-VhdOutput:SpaceSavedGB"   = 0
-            "Write-VhdOutput:FullName"       = $Disk.FullName
-            "Write-VhdOutput:Passthru"       = $Passthru
+            "Write-VhdOutput:Path"         = $LogFilePath
+            "Write-VhdOutput:StartTime"    = $startTime
+            "Write-VhdOutput:Name"         = $Disk.Name
+            "Write-VhdOutput:DiskState"    = $null
+            "Write-VhdOutput:OriginalSize" = $originalSize
+            "Write-VhdOutput:FinalSize"    = $originalSize
+            "Write-VhdOutput:FullName"     = $Disk.FullName
+            "Write-VhdOutput:Passthru"     = $Passthru
         }
 
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat' -EndTime (Get-Date)
             return
         }
 
@@ -1612,18 +1665,18 @@ function Optimize-OneDisk {
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
+                    Write-VhdOutput -DiskState "Deleted" -FinalSize 0 -EndTime (Get-Date)
                 }
                 catch {
-                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed' -EndTime (Get-Date)
                 }
                 return
             }
         }
 
-        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
-        if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-            Write-VhdOutput -DiskState 'Ignored'
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small onesBytes
+        if ( $IgnoreLessThanGB -and $originalSize -lt $IgnoreLessThanBytes ) {
+            Write-VhdOutput -DiskState 'Ignored' -EndTime (Get-Date)
             return
         }
 
@@ -1633,7 +1686,7 @@ function Optimize-OneDisk {
         }
         catch {
             $diskError = $error[0]
-            Write-VhdOutput -DiskState $diskError.exception.message
+            Write-VhdOutput -DiskState $diskError.exception.message -EndTime (Get-Date)
             return
         }
 
@@ -1646,7 +1699,7 @@ function Optimize-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            Write-VhdOutput -DiskState 'NoPartitionInfo'
+            Write-VhdOutput -DiskState 'NoPartitionInfo' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -1655,14 +1708,14 @@ function Optimize-OneDisk {
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
-            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
 
 
         if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -1695,7 +1748,7 @@ function Optimize-OneDisk {
             #Whatever happens now we need to dismount
 
             if ($resize -eq $false) {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
                 $mount | DisMount-FslDisk
                 return
             }
@@ -1718,7 +1771,7 @@ function Optimize-OneDisk {
                 #A better way would be to use optimize-vhd from the Hyper-V module,
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though, it would be a way to solve localisation issues.
                 Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
                 Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
@@ -1732,7 +1785,6 @@ function Optimize-OneDisk {
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
-                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
             }
@@ -1745,7 +1797,7 @@ function Optimize-OneDisk {
         }
 
         If ($success -ne $true) {
-            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
             Remove-Item $tempFileName
             return
         }
@@ -1758,14 +1810,14 @@ function Optimize-OneDisk {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
                 Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
                 $paramWriteVhdOutput = @{
-                    DiskState    = "Success"
-                    FinalSizeGB  = $finalSizeGB
-                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
+                    DiskState = "Success"
+                    FinalSize = $finalSize
+                    EndTime   = Get-Date
                 }
                 Write-VhdOutput @paramWriteVhdOutput
             }
             catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
                 return
             }
             finally {
@@ -1773,10 +1825,11 @@ function Optimize-OneDisk {
             }
         }
 
+
         $paramWriteVhdOutput = @{
-            DiskState    = "Success"
-            FinalSizeGB  = $finalSizeGB
-            SpaceSavedGB = $originalSizeGB - $finalSizeGB
+            DiskState = "Success"
+            FinalSize = $finalSize
+            EndTime   = Get-Date
         }
         Write-VhdOutput @paramWriteVhdOutput
     } #Process
@@ -1805,22 +1858,27 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$OriginalSizeGB,
+        [System.String]$OriginalSize,
 
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$FinalSizeGB,
-
-        [Parameter(
-            Mandatory = $true
-        )]
-        [System.String]$SpaceSavedGB,
+        [System.String]$FinalSize,
 
         [Parameter(
             Mandatory = $true
         )]
         [System.String]$FullName,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$StartTime,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$EndTime,
 
         [Parameter(
             Mandatory = $true
@@ -1833,13 +1891,17 @@ function Write-VhdOutput {
     } # Begin
     PROCESS {
 
+        #unit conversion and calculation should happen in output function
         $output = [PSCustomObject]@{
-            Name           = $Name
-            DiskState      = $DiskState
-            OriginalSizeGB = $OriginalSizeGB
-            FinalSizeGB    = $FinalSizeGB
-            SpaceSavedGB   = $SpaceSavedGB
-            FullName       = $FullName
+            Name             = $Name
+            StartTime        = $StartTime.ToLongTimeString()
+            EndTime          = $EndTime.ToLongTimeString()
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
+            DiskState        = $DiskState
+            OriginalSizeGB   = [math]::Round( $OriginalSize / 1GB, 2 )
+            FinalSizeGB      = [math]::Round( $FinalSize / 1GB, 2 )
+            SpaceSavedGB     = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
+            FullName         = $FullName
         }
 
         if ($Passthru) {
@@ -1848,11 +1910,11 @@ function Write-VhdOutput {
         $success = $False
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
-            try{
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+            try {
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation
                 $success = $true
             }
-            catch{
+            catch {
                 $retries++
             }
             Start-Sleep 1
