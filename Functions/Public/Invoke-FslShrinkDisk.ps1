@@ -65,7 +65,7 @@
         Returns an object representing the item with which you are working. By default, this cmdlet does not generate any pipeline output.
 
         .PARAMETER ThrottleLimit
-        Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 4.
+        Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
         .PARAMETER RatioFreeSpace
         The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05.  This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
@@ -108,7 +108,7 @@
 
         .EXAMPLE
         C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -ThrottleLimit 20
-        This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 4.
+        This shrinks all disks in the specified share recursively increasing the number of threads used to 20 from the default 8.
 
         .EXAMPLE
         C:\PS> Invoke-FslShrinkDisk -Path \\server\share -Recurse -RatioFreeSpace 0.3
@@ -159,7 +159,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [int]$ThrottleLimit = 4,
+    [int]$ThrottleLimit = 8,
 
     [Parameter(
         ValuefromPipelineByPropertyName = $true
