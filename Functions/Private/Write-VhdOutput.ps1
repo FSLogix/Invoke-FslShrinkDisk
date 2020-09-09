@@ -40,6 +40,16 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
+        [datetime]$StartTime,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$EndTime,
+
+        [Parameter(
+            Mandatory = $true
+        )]
         [Switch]$Passthru
     )
 
@@ -49,12 +59,15 @@ function Write-VhdOutput {
     PROCESS {
 
         $output = [PSCustomObject]@{
-            Name           = $Name
-            DiskState      = $DiskState
-            OriginalSizeGB = $OriginalSizeGB
-            FinalSizeGB    = $FinalSizeGB
-            SpaceSavedGB   = $SpaceSavedGB
-            FullName       = $FullName
+            Name             = $Name
+            StartTime        = $StartTime.ToLongTimeString()
+            EndTime          = $EndTime.ToLongTimeString()
+            'ElapsedTime(s)' = [math]::floor(($EndTime - $StartTime).TotalSeconds)
+            DiskState        = $DiskState
+            OriginalSizeGB   = $OriginalSizeGB
+            FinalSizeGB      = $FinalSizeGB
+            SpaceSavedGB     = $SpaceSavedGB
+            FullName         = $FullName
         }
 
         if ($Passthru) {
@@ -63,11 +76,11 @@ function Write-VhdOutput {
         $success = $False
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
-            try{
+            try {
                 $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
                 $success = $true
             }
-            catch{
+            catch {
                 $retries++
             }
             Start-Sleep 1

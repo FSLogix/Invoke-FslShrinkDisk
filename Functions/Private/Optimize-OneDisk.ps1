@@ -42,12 +42,14 @@ function Optimize-OneDisk {
         $hyperv = $false
     } # Begin
     PROCESS {
+        $startTime = Get-Date
         #Grab size of disk being porcessed
         $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
 
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
             "Write-VhdOutput:Path"           = $LogFilePath
+            "Write-VhdOutput:StartTime"      = $startTime
             "Write-VhdOutput:Name"           = $Disk.Name
             "Write-VhdOutput:DiskState"      = $null
             "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
@@ -59,7 +61,7 @@ function Optimize-OneDisk {
 
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-            Write-VhdOutput -DiskState 'FileIsNotDiskFormat'
+            Write-VhdOutput -DiskState 'FileIsNotDiskFormat' -EndTime (Get-Date)
             return
         }
 
@@ -70,10 +72,10 @@ function Optimize-OneDisk {
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB
+                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB -EndTime (Get-Date)
                 }
                 catch {
-                    Write-VhdOutput -DiskState 'DiskDeletionFailed'
+                    Write-VhdOutput -DiskState 'DiskDeletionFailed' -EndTime (Get-Date)
                 }
                 return
             }
@@ -81,7 +83,7 @@ function Optimize-OneDisk {
 
         #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
         if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
-            Write-VhdOutput -DiskState 'Ignored'
+            Write-VhdOutput -DiskState 'Ignored' -EndTime (Get-Date)
             return
         }
 
@@ -91,7 +93,7 @@ function Optimize-OneDisk {
         }
         catch {
             $diskError = $error[0]
-            Write-VhdOutput -DiskState $diskError.exception.message
+            Write-VhdOutput -DiskState $diskError.exception.message -EndTime (Get-Date)
             return
         }
 
@@ -104,7 +106,7 @@ function Optimize-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            Write-VhdOutput -DiskState 'NoPartitionInfo'
+            Write-VhdOutput -DiskState 'NoPartitionInfo' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -113,14 +115,14 @@ function Optimize-OneDisk {
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
-            Write-VhdOutput -DiskState "SkippedAlreadyMinimum"
+            Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
 
 
         if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk"
+            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -153,7 +155,7 @@ function Optimize-OneDisk {
             #Whatever happens now we need to dismount
 
             if ($resize -eq $false) {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed"
+                Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
                 $mount | DisMount-FslDisk
                 return
             }
@@ -203,7 +205,7 @@ function Optimize-OneDisk {
         }
 
         If ($success -ne $true) {
-            Write-VhdOutput -DiskState "DiskShrinkFailed"
+            Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
             Remove-Item $tempFileName
             return
         }
@@ -219,11 +221,12 @@ function Optimize-OneDisk {
                     DiskState    = "Success"
                     FinalSizeGB  = $finalSizeGB
                     SpaceSavedGB = $originalSizeGB - $finalSizeGB
+                    EndTime      = Get-Date
                 }
                 Write-VhdOutput @paramWriteVhdOutput
             }
             catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed"
+                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
                 return
             }
             finally {
@@ -231,10 +234,12 @@ function Optimize-OneDisk {
             }
         }
 
+
         $paramWriteVhdOutput = @{
             DiskState    = "Success"
             FinalSizeGB  = $finalSizeGB
             SpaceSavedGB = $originalSizeGB - $finalSizeGB
+            EndTime      = Get-Date
         }
         Write-VhdOutput @paramWriteVhdOutput
     } #Process
