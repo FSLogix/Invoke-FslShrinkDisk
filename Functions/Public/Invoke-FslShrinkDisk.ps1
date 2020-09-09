@@ -171,8 +171,8 @@ BEGIN {
     Set-StrictMode -Version Latest
     #Requires -RunAsAdministrator
 
-    #Test-FslDependancies
-    . .\Functions\Private\Test-FslDependancies.ps1
+    #Test-FslDependencies
+    . .\Functions\Private\Test-FslDependencies.ps1
 
     #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
     . .\Functions\Private\Invoke-Parallel.ps1
@@ -190,7 +190,7 @@ BEGIN {
     . .\Functions\Private\Write-VhdOutput.ps1
 
     $servicesToTest = 'defragsvc', 'vds'
-    $numberOfCores = $servicesToTest | Test-FslDependancies
+    $numberOfCores = $servicesToTest | Test-FslDependencies
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
         Write-Warning ("Number of threads set to double the number of cores - $numberOfCores")
