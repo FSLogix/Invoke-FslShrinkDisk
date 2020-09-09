@@ -78,7 +78,7 @@ function Mount-FslDisk {
                 }
             }
             catch {
-                $partitionType -eq $false
+                $partitionType = $false
             }
             Start-Sleep 0.1
         }
