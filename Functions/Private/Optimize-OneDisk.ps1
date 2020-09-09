@@ -43,20 +43,23 @@ function Optimize-OneDisk {
     } # Begin
     PROCESS {
         $startTime = Get-Date
+        if ( $IgnoreLessThanGB ) {
+            $IgnoreLessThanBytes = $IgnoreLessThanGB * 1024 * 1024 * 1024
+        }
+
         #Grab size of disk being porcessed
-        $originalSizeGB = [math]::Round( $Disk.Length / 1GB, 2 )
+        $originalSize = $Disk.Length
 
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
         $PSDefaultParameterValues = @{
-            "Write-VhdOutput:Path"           = $LogFilePath
-            "Write-VhdOutput:StartTime"      = $startTime
-            "Write-VhdOutput:Name"           = $Disk.Name
-            "Write-VhdOutput:DiskState"      = $null
-            "Write-VhdOutput:OriginalSizeGB" = $originalSizeGB
-            "Write-VhdOutput:FinalSizeGB"    = $originalSizeGB
-            "Write-VhdOutput:SpaceSavedGB"   = 0
-            "Write-VhdOutput:FullName"       = $Disk.FullName
-            "Write-VhdOutput:Passthru"       = $Passthru
+            "Write-VhdOutput:Path"         = $LogFilePath
+            "Write-VhdOutput:StartTime"    = $startTime
+            "Write-VhdOutput:Name"         = $Disk.Name
+            "Write-VhdOutput:DiskState"    = $null
+            "Write-VhdOutput:OriginalSize" = $originalSize
+            "Write-VhdOutput:FinalSize"    = $originalSize
+            "Write-VhdOutput:FullName"     = $Disk.FullName
+            "Write-VhdOutput:Passthru"     = $Passthru
         }
 
         #Check it is a disk
@@ -72,7 +75,7 @@ function Optimize-OneDisk {
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Deleted" -FinalSizeGB 0 -SpaceSavedGB $originalSizeGB -EndTime (Get-Date)
+                    Write-VhdOutput -DiskState "Deleted" -FinalSize 0 -EndTime (Get-Date)
                 }
                 catch {
                     Write-VhdOutput -DiskState 'DiskDeletionFailed' -EndTime (Get-Date)
@@ -81,8 +84,8 @@ function Optimize-OneDisk {
             }
         }
 
-        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
-        if ( $IgnoreLessThanGB -and $originalSizeGB -lt $IgnoreLessThanGB ) {
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small onesBytes
+        if ( $IgnoreLessThanGB -and $originalSize -lt $IgnoreLessThanBytes ) {
             Write-VhdOutput -DiskState 'Ignored' -EndTime (Get-Date)
             return
         }
@@ -178,7 +181,7 @@ function Optimize-OneDisk {
                 #A better way would be to use optimize-vhd from the Hyper-V module,
                 #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
                 #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though
+                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though, it would be a way to solve localisation issues.
                 Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
                 Add-Content -Path $Path -Value 'attach vdisk readonly'
                 Add-Content -Path $Path -Value 'COMPACT VDISK'
@@ -192,7 +195,6 @@ function Optimize-OneDisk {
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
-                $finalSizeGB = [math]::Round( $finalSize / 1GB, 2 )
                 $success = $true
                 Remove-Item $tempFileName
             }
@@ -218,10 +220,9 @@ function Optimize-OneDisk {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
                 Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
                 $paramWriteVhdOutput = @{
-                    DiskState    = "Success"
-                    FinalSizeGB  = $finalSizeGB
-                    SpaceSavedGB = $originalSizeGB - $finalSizeGB
-                    EndTime      = Get-Date
+                    DiskState = "Success"
+                    FinalSize = $finalSize
+                    EndTime   = Get-Date
                 }
                 Write-VhdOutput @paramWriteVhdOutput
             }
@@ -236,10 +237,9 @@ function Optimize-OneDisk {
 
 
         $paramWriteVhdOutput = @{
-            DiskState    = "Success"
-            FinalSizeGB  = $finalSizeGB
-            SpaceSavedGB = $originalSizeGB - $finalSizeGB
-            EndTime      = Get-Date
+            DiskState = "Success"
+            FinalSize = $finalSize
+            EndTime   = Get-Date
         }
         Write-VhdOutput @paramWriteVhdOutput
     } #Process

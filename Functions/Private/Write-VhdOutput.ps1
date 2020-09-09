@@ -20,17 +20,12 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$OriginalSizeGB,
+        [System.String]$OriginalSize,
 
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$FinalSizeGB,
-
-        [Parameter(
-            Mandatory = $true
-        )]
-        [System.String]$SpaceSavedGB,
+        [System.String]$FinalSize,
 
         [Parameter(
             Mandatory = $true
@@ -62,11 +57,11 @@ function Write-VhdOutput {
             Name             = $Name
             StartTime        = $StartTime.ToLongTimeString()
             EndTime          = $EndTime.ToLongTimeString()
-            'ElapsedTime(s)' = [math]::floor(($EndTime - $StartTime).TotalSeconds)
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
             DiskState        = $DiskState
-            OriginalSizeGB   = $OriginalSizeGB
-            FinalSizeGB      = $FinalSizeGB
-            SpaceSavedGB     = $SpaceSavedGB
+            OriginalSizeGB   = [math]::Round( $OriginalSize / 1GB, 2 )
+            FinalSizeGB      = [math]::Round( $FinalSize / 1GB, 2 )
+            SpaceSavedGB     = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
             FullName         = $FullName
         }
 

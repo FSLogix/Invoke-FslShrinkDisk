@@ -9,19 +9,28 @@ BeforeAll {
 
 Describe "Describing Write-VhdOutput" {
 
-    It "Does not error" {
-
+    BeforeAll {
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $param = @{
             Path           = "TestDrive:\ICareNot.csv"
             Name           = 'Jim.vhdx'
             DiskState      = 'Amazing'
             OriginalSizeGB = 40
             FinalSizeGB    = 1
-            SpaceSavedGB   = 39
             FullName       = "TestDrive:\Jim.vhdx"
             Passthru       = $true
+            Starttime      = Get-Date
+            EndTime        = Get-Date.AddSeconds(20)
         }
+    }
+
+    It "Does not error" {
+
         Write-VhdOutput @param -ErrorAction Stop
+    }
+
+    It Calculates time {
+
     }
 
 }
