@@ -52,7 +52,10 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount Disk Due to no Disknumber'
+            }
             Write-Error 'Cannot get mount information'
             return
         }
@@ -69,7 +72,10 @@ function Mount-FslDisk {
         }
 
         if ($partitionType -eq $false) {
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount disk with no partition'
+            }
             Write-Error 'Cannot get partition information'
             return
         }
@@ -86,7 +92,10 @@ function Mount-FslDisk {
         catch {
             $e = $error[0]
             # Cleanup
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no folder could be created - `"$e`""
+            }
             Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
@@ -105,7 +114,10 @@ function Mount-FslDisk {
             $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no junction point could be created - `"$e`""
+            }
             Write-Error "Failed to create junction point to - `"$e`""
             return
         }

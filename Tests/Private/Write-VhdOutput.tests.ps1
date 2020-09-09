@@ -20,7 +20,7 @@ Describe "Describing Write-VhdOutput" {
             FullName       = "TestDrive:\Jim.vhdx"
             Passthru       = $true
             Starttime      = Get-Date
-            EndTime        = Get-Date.AddSeconds(20)
+            EndTime        = (Get-Date).AddSeconds(20)
         }
     }
 
@@ -36,7 +36,7 @@ Describe "Describing Write-VhdOutput" {
 
     It 'Calculates Elapsed time' {
         $r = Write-VhdOutput @param
-        $r.'ElapsedTime(s)' | Should -Be 39
+        $r.SpaceSavedGB | Should -Be 39
     }
 
 }
