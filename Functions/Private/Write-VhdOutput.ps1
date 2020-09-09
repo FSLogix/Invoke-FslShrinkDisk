@@ -53,6 +53,7 @@ function Write-VhdOutput {
     } # Begin
     PROCESS {
 
+        #unit conversion and calculation should happen in output function
         $output = [PSCustomObject]@{
             Name             = $Name
             StartTime        = $StartTime.ToLongTimeString()
@@ -72,7 +73,7 @@ function Write-VhdOutput {
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
             try {
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation
                 $success = $true
             }
             catch {

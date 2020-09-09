@@ -15,8 +15,8 @@ Describe "Describing Write-VhdOutput" {
             Path           = "TestDrive:\ICareNot.csv"
             Name           = 'Jim.vhdx'
             DiskState      = 'Amazing'
-            OriginalSizeGB = 40
-            FinalSizeGB    = 1
+            OriginalSize = 40 * 1024  * 1024 * 1024
+            FinalSize   = 1 * 1024  * 1024 * 1024
             FullName       = "TestDrive:\Jim.vhdx"
             Passthru       = $true
             Starttime      = Get-Date
@@ -29,8 +29,14 @@ Describe "Describing Write-VhdOutput" {
         Write-VhdOutput @param -ErrorAction Stop
     }
 
-    It Calculates time {
+    It 'Calculates Elapsed time' {
+        $r = Write-VhdOutput @param
+        $r.'ElapsedTime(s)' | Should -Be 20
+    }
 
+    It 'Calculates Elapsed time' {
+        $r = Write-VhdOutput @param
+        $r.'ElapsedTime(s)' | Should -Be 39
     }
 
 }
