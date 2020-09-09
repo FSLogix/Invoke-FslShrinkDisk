@@ -27,8 +27,6 @@ Describe "Describing Dismount-FslDisk" {
             }
         }
 
-
-
         It "Takes input via param" {
             Dismount-FslDisk -Path $Path -ImagePath $imPath -ErrorAction Stop | Should -BeNullOrEmpty
         }

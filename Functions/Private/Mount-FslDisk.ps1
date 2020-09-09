@@ -68,12 +68,19 @@ function Mount-FslDisk {
         $partitionType = $false
         $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
-            Start-Sleep 0.1
-            $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
-            if ($allPartition.Type -contains 'Basic') {
-                $partitionType = $true
-                $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+
+            try {
+                $allPartition = Get-Partition -DiskNumber $mountedDisk.Number -ErrorAction Stop
+
+                if ($allPartition.Type -contains 'Basic') {
+                    $partitionType = $true
+                    $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                }
             }
+            catch {
+                $partitionType -eq $false
+            }
+            Start-Sleep 0.1
         }
 
         if ($partitionType -eq $false) {

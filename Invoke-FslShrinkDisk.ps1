@@ -803,6 +803,7 @@ function Mount-FslDisk {
         $timespan = (Get-Date).AddSeconds($TimeOut)
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
             Start-Sleep 0.1
+
             $allPartition = Get-Partition -DiskNumber $mountedDisk.Number
             if ($allPartition.Type -contains 'Basic') {
                 $partitionType = $true
