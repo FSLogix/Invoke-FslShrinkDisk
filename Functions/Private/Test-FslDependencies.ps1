@@ -40,11 +40,13 @@ Function Test-FslDependencies {
             }
 
             Start-Service -Name $svc
+
+            if ((Get-Service -Name $svc).Status -ne 'Running') {
+                Write-Error "Can not start $svcObject.DisplayName"
+            }
         }
     }
     END {
-        $cores = Get-CimInstance Win32_Processor | Select-Object -ExpandProperty NumberOfCores
 
-        Write-Output $cores
     }
 }

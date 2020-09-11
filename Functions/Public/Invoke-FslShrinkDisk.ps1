@@ -190,11 +190,20 @@ BEGIN {
     . .\Functions\Private\Write-VhdOutput.ps1
 
     $servicesToTest = 'defragsvc', 'vds'
-    $numberOfCores = $servicesToTest | Test-FslDependencies
+    try{
+        $servicesToTest | Test-FslDependencies
+    }
+    catch{
+        $err = $error[0]
+        Write-Error $err
+        return
+    }
+    $numberOfCores = Get-CimInstance Win32_Processor | Select-Object -ExpandProperty NumberOfCores
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
-        Write-Warning ("Number of threads set to double the number of cores - $numberOfCores")
+
         $ThrottleLimit = $numberOfCores * 2
+        Write-Warning "Number of threads set to double the number of cores - $ThrottleLimit"
     }
 
 } # Begin
