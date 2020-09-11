@@ -27,6 +27,11 @@ function Optimize-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
+        [int]$MountTimeout = 30,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
         [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
@@ -91,12 +96,19 @@ function Optimize-OneDisk {
         }
 
         #Initial disk Mount
-        try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru -ErrorAction Stop
+        $mountSpan = (Get-Date).AddSeconds($MountTimeout)
+        while ($mountFlag -eq $false -and $mountSpan -gt (Get-Date)) {
+            try {
+                $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 3 -PassThru -ErrorAction Stop
+                $mountFlag -eq $true
+            }
+            catch {
+                $mountFlag -eq $false
+            }
         }
-        catch {
-            $diskError = $error[0]
-            Write-VhdOutput -DiskState $diskError.exception.message -EndTime (Get-Date)
+
+        if ($mountFlag -ne $true) {
+            Write-VhdOutput -DiskState 'The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             return
         }
 

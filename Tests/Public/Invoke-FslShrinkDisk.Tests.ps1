@@ -39,10 +39,10 @@ Describe 'Invoke-FslShrinkDisk' {
         }
         Mock -CommandName Get-CimInstance -MockWith {
             [PSCustomObject]@{
-                NumberOfCores = 2
+                NumberOfCores = 4
             }
         }
-        Mock -CommandName Get-ChildItem -MockWith { $null }
+        Mock -CommandName Get-ChildItem -MockWith { 'TestDrive:\FakeDisk.vhd' }
         Mock -CommandName Test-FslDependencies -MockWith { $null }
         Mock -CommandName Dismount-FslDisk -MockWith { $null }
         Mock -CommandName Write-VhdOutput -MockWith { $null }
@@ -54,5 +54,9 @@ Describe 'Invoke-FslShrinkDisk' {
 
     It "Does not error" {
         Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -ErrorAction Stop
+    }
+
+    It 'Takes Input via pipeline'{
+        'TestDrive:\FakeDisk.vhd' | Invoke-FslShrinkDisk
     }
 }

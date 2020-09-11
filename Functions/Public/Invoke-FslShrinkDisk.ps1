@@ -191,7 +191,7 @@ BEGIN {
 
     $servicesToTest = 'defragsvc', 'vds'
     try{
-        $servicesToTest | Test-FslDependencies
+        $servicesToTest | Test-FslDependencies -ErrorAction Stop
     }
     catch{
         $err = $error[0]
