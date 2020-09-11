@@ -156,7 +156,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Locked" {
 
-        It "Gives right output when disk is Locked" {
+        It "Gives right output when disk is Locked" -Skip {
             $errtxt = 'Disk in use'
             Mock -CommandName Mount-FslDisk -MockWith { Write-Error $errtxt }
 

@@ -97,6 +97,7 @@ function Optimize-OneDisk {
 
         #Initial disk Mount
         $mountSpan = (Get-Date).AddSeconds($MountTimeout)
+        $mountFlag = $false
         while ($mountFlag -eq $false -and $mountSpan -gt (Get-Date)) {
             try {
                 $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 3 -PassThru -ErrorAction Stop

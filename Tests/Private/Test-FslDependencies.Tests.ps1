@@ -33,11 +33,11 @@ Describe "Describing Test-FslDependencies" {
         }
 
         It "Takes input via param" {
-            Test-FslDependencies -Service NullService | Should -be 1
+            Test-FslDependencies -Service NullService | Should -BeNullOrEmpty
         }
 
         It "Takes input via pipeline" {
-            "NullService" | Test-FslDependencies | Should -be 1
+            "NullService" | Test-FslDependencies | Should -be -BeNullOrEmpty
         }
     }
 }
