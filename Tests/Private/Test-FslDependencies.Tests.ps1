@@ -37,7 +37,7 @@ Describe "Describing Test-FslDependencies" {
         }
 
         It "Takes input via pipeline" {
-            "NullService" | Test-FslDependencies | Should -be -BeNullOrEmpty
+            "NullService" | Test-FslDependencies | Should -BeNullOrEmpty
         }
     }
 }
