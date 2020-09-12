@@ -8,26 +8,21 @@ BeforeAll {
 
 Describe "Describing Test-FslDependencies" {
 
+    BeforeAll {
+        Mock -CommandName Set-Service -MockWith {
+            $null
+        }
+        Mock -CommandName Start-Service -MockWith {
+            $null
+        }
+    }
+
     Context "Input" {
         BeforeAll {
             Mock -CommandName Get-Service -MockWith {
                 [PSCustomObject]@{
-                    Status          = "Running"
-                    StartupType     = "Disabled"
-                }
-            }
-
-            Mock -CommandName Set-Service -MockWith {
-                $null
-            }
-
-            Mock -CommandName Start-Service -MockWith {
-                $null
-            }
-
-            Mock -CommandName Get-CimInstance -MockWith {
-                [PSCustomObject]@{
-                    NumberOfCores       = 1
+                    Status      = "Running"
+                    StartupType = "Disabled"
                 }
             }
         }
@@ -38,6 +33,30 @@ Describe "Describing Test-FslDependencies" {
 
         It "Takes input via pipeline" {
             "NullService" | Test-FslDependencies | Should -BeNullOrEmpty
+        }
+
+        It "Takes multiple services as parameter input" {
+            Test-FslDependencies -Service "NullService", 'NotService' | Should -BeNullOrEmpty
+        }
+
+        It "Takes multiple services as pipeline input" {
+            "NullService", 'NotService' | Test-FslDependencies | Should -BeNullOrEmpty
+        }
+    }
+
+    Context "Logic" {
+        BeforeAll {
+            Mock -CommandName Get-Service -MockWith {
+                [PSCustomObject]@{
+                    Status      = "Stopped"
+                    StartType = "Disabled"
+                }
+            }
+        }
+
+        It "Sets to manual" {
+
+            Test-FslDependencies -Service NullService | Should -BeNullOrEmpty
         }
     }
 }

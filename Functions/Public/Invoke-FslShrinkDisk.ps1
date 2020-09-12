@@ -164,6 +164,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
+    [ValidateRange(0,1)]
     [double]$RatioFreeSpace = 0.05
 )
 
@@ -220,7 +221,7 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path -Recurse
     }
     else {
-        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
+        $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
 
     #If we can't find and files with the extension vhd or vhdx quit
