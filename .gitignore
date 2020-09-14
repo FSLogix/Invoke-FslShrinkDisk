@@ -8,6 +8,8 @@ Setup.ps1
 StartSOD.ps1
 Startmount.ps1
 Pester.ps1
+SetupTestManyThreads.ps1
+SetupTest.ps1
 
 # Test results
 CodeCoverage.xml

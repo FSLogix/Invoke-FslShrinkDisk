@@ -203,7 +203,7 @@ BEGIN {
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
 
-        $ThrottleLimit = $numberOfCores * 2
+        #$ThrottleLimit = $numberOfCores * 2
         Write-Warning "Number of threads set to double the number of cores - $ThrottleLimit"
     }
 

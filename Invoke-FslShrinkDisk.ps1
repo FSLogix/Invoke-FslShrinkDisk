@@ -164,6 +164,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
+    [ValidateRange(0,1)]
     [double]$RatioFreeSpace = 0.05
 )
 
@@ -178,32 +179,18 @@ Function Test-FslDependencies {
         [Parameter(
             Mandatory = $true,
             Position = 0,
-            ParameterSetName="ServiceName",
             ValueFromPipelineByPropertyName = $true,
             ValueFromPipeline = $true
         )]
-        [System.String[]]$Service,
-
-        [Parameter(
-            Mandatory=$true,
-            Position = 1,
-            ParameterSetName = "ServiceObject",
-            ValueFromPipelineByPropertyName = $true,
-            ValueFromPipeline = $true
-        )]
-        [System.ServiceProcess.ServiceController]$InputObject
+        [System.String[]]$Name
     )
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
     }
     PROCESS {
-        If ($PSCmdlet.ParameterSetName -eq "ServiceObject") {
-            Test-FslDependencies -Service $InputObject.Name
-            Break
-        }
 
-        Foreach ($svc in $Service) {
+        Foreach ($svc in $Name) {
             $svcObject = Get-Service -Name $svc
 
             If ($svcObject.Status -eq "Running") { Return }
@@ -866,7 +853,15 @@ function Mount-FslDisk {
                 }
             }
             catch {
-                $partitionType = $false
+                if (($allPartition | Measure-Object).Count -gt 0) {
+                    $partition = $allPartition | Select-Object -Last 1
+                    $partitionType = $true
+                }
+                else{
+
+                    $partitionType = $false
+                }
+
             }
             Start-Sleep 0.1
         }
@@ -1137,24 +1132,34 @@ function Optimize-OneDisk {
         }
 
         #Initial disk Mount
-        $mountSpan = (Get-Date).AddSeconds($MountTimeout)
-        $mountFlag = $false
-        while ($mountFlag -eq $false -and $mountSpan -gt (Get-Date)) {
-            try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 3 -PassThru -ErrorAction Stop
-                $mountFlag -eq $true
-            }
-            catch {
-                $mountFlag -eq $false
-            }
+
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 30 -PassThru -ErrorAction Stop
+        }
+        catch {
+            $err = $error[0]
+            Write-VhdOutput -DiskState $err -EndTime (Get-Date)
+            return
         }
 
-        if ($mountFlag -ne $true) {
+        $timespan = (Get-Date).AddSeconds(120)
+        $partInfo = $null
+        while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
+            try {
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
+            }
+            catch {
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction SilentlyContinue | Select-Object -Last 1
+            }
+            Start-Sleep 0.1
+        }
+
+        if (($partInfo | Measure-Object).Count -eq 0) {
+            $mount | DisMount-FslDisk
             Write-VhdOutput -DiskState 'The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
@@ -1163,8 +1168,9 @@ function Optimize-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            Write-VhdOutput -DiskState 'NoPartitionInfo' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
+
             return
         }
 
@@ -1403,7 +1409,7 @@ function Write-VhdOutput {
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
 
-        $ThrottleLimit = $numberOfCores * 2
+        #$ThrottleLimit = $numberOfCores * 2
         Write-Warning "Number of threads set to double the number of cores - $ThrottleLimit"
     }
 
@@ -1421,7 +1427,7 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path -Recurse
     }
     else {
-        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
+        $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
 
     #If we can't find and files with the extension vhd or vhdx quit
@@ -1515,7 +1521,15 @@ function Mount-FslDisk {
                 }
             }
             catch {
-                $partitionType = $false
+                if (($allPartition | Measure-Object).Count -gt 0) {
+                    $partition = $allPartition | Select-Object -Last 1
+                    $partitionType = $true
+                }
+                else{
+
+                    $partitionType = $false
+                }
+
             }
             Start-Sleep 0.1
         }
@@ -1784,24 +1798,34 @@ function Optimize-OneDisk {
         }
 
         #Initial disk Mount
-        $mountSpan = (Get-Date).AddSeconds($MountTimeout)
-        $mountFlag = $false
-        while ($mountFlag -eq $false -and $mountSpan -gt (Get-Date)) {
-            try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 3 -PassThru -ErrorAction Stop
-                $mountFlag -eq $true
-            }
-            catch {
-                $mountFlag -eq $false
-            }
+
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 30 -PassThru -ErrorAction Stop
+        }
+        catch {
+            $err = $error[0]
+            Write-VhdOutput -DiskState $err -EndTime (Get-Date)
+            return
         }
 
-        if ($mountFlag -ne $true) {
+        $timespan = (Get-Date).AddSeconds(120)
+        $partInfo = $null
+        while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
+            try {
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
+            }
+            catch {
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction SilentlyContinue | Select-Object -Last 1
+            }
+            Start-Sleep 0.1
+        }
+
+        if (($partInfo | Measure-Object).Count -eq 0) {
+            $mount | DisMount-FslDisk
             Write-VhdOutput -DiskState 'The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             return
         }
 
-        $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
@@ -1810,8 +1834,9 @@ function Optimize-OneDisk {
             $sizeMax = $partitionsize.SizeMax
         }
         catch {
-            Write-VhdOutput -DiskState 'NoPartitionInfo' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
+
             return
         }
 

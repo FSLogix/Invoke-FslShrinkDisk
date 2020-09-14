@@ -4,32 +4,18 @@ Function Test-FslDependencies {
         [Parameter(
             Mandatory = $true,
             Position = 0,
-            ParameterSetName="ServiceName",
             ValueFromPipelineByPropertyName = $true,
             ValueFromPipeline = $true
         )]
-        [System.String[]]$Service,
-
-        [Parameter(
-            Mandatory=$true,
-            Position = 1,
-            ParameterSetName = "ServiceObject",
-            ValueFromPipelineByPropertyName = $true,
-            ValueFromPipeline = $true
-        )]
-        [System.ServiceProcess.ServiceController]$InputObject
+        [System.String[]]$Name
     )
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
     }
     PROCESS {
-        If ($PSCmdlet.ParameterSetName -eq "ServiceObject") {
-            Test-FslDependencies -Service $InputObject.Name
-            Break
-        }
 
-        Foreach ($svc in $Service) {
+        Foreach ($svc in $Name) {
             $svcObject = Get-Service -Name $svc
 
             If ($svcObject.Status -eq "Running") { Return }

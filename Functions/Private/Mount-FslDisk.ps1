@@ -78,7 +78,15 @@ function Mount-FslDisk {
                 }
             }
             catch {
-                $partitionType = $false
+                if (($allPartition | Measure-Object).Count -gt 0) {
+                    $partition = $allPartition | Select-Object -Last 1
+                    $partitionType = $true
+                }
+                else{
+
+                    $partitionType = $false
+                }
+
             }
             Start-Sleep 0.1
         }
