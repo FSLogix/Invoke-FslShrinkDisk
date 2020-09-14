@@ -22,10 +22,10 @@ Function Test-FslDependencies {
 
             If ($svcObject.StartType -eq "Disabled") {
                 Write-Warning ("[{0}] Setting Service to Manual" -f $svcObject.DisplayName)
-                Set-Service -Name $svc -StartupType Manual
+                Set-Service -Name $svc -StartupType Manual | Out-Null
             }
 
-            Start-Service -Name $svc
+            Start-Service -Name $svc | Out-Null
 
             if ((Get-Service -Name $svc).Status -ne 'Running') {
                 Write-Error "Can not start $svcObject.DisplayName"
