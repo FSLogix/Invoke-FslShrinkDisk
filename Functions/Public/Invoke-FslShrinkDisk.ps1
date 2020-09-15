@@ -199,7 +199,7 @@ BEGIN {
         Write-Error $err
         return
     }
-    $numberOfCores = Get-CimInstance Win32_Processor | Select-Object -ExpandProperty NumberOfCores
+    $numberOfCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
 

@@ -148,7 +148,6 @@ function Optimize-OneDisk {
         }
 
 
-
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
