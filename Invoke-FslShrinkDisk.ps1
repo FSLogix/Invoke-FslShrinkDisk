@@ -197,10 +197,10 @@ Function Test-FslDependencies {
 
             If ($svcObject.StartType -eq "Disabled") {
                 Write-Warning ("[{0}] Setting Service to Manual" -f $svcObject.DisplayName)
-                Set-Service -Name $svc -StartupType Manual
+                Set-Service -Name $svc -StartupType Manual | Out-Null
             }
 
-            Start-Service -Name $svc
+            Start-Service -Name $svc | Out-Null
 
             if ((Get-Service -Name $svc).Status -ne 'Running') {
                 Write-Error "Can not start $svcObject.DisplayName"
@@ -1163,16 +1163,26 @@ function Optimize-OneDisk {
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-        try {
-            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
-            $sizeMax = $partitionsize.SizeMax
+        $partSize = $false
+        $timespan = (Get-Date).AddSeconds(30)
+        while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+            try {
+                $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
+                $sizeMax = $partitionsize.SizeMax
+                $partSize = $true
+            }
+            catch {
+                $partSize = $false
+                Start-Sleep 0.1
+            }
         }
-        catch {
+
+        if ($partSize -eq $false) {
             Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
-
             return
         }
+
 
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
@@ -1429,6 +1439,8 @@ PROCESS {
     else {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
+
+    $diskList = $diskList | Where-Object {$_.Name -ne "Merge.vhdx"}
 
     #If we can't find and files with the extension vhd or vhdx quit
     if ( ($diskList | Measure-Object).count -eq 0 ) {
@@ -1829,16 +1841,26 @@ function Optimize-OneDisk {
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-        try {
-            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
-            $sizeMax = $partitionsize.SizeMax
+        $partSize = $false
+        $timespan = (Get-Date).AddSeconds(30)
+        while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+            try {
+                $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
+                $sizeMax = $partitionsize.SizeMax
+                $partSize = $true
+            }
+            catch {
+                $partSize = $false
+                Start-Sleep 0.1
+            }
         }
-        catch {
+
+        if ($partSize -eq $false) {
             Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
-
             return
         }
+
 
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk

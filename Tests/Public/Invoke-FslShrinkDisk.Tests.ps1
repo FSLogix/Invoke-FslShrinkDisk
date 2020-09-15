@@ -42,7 +42,12 @@ Describe 'Invoke-FslShrinkDisk' {
                 NumberOfCores = 4
             }
         }
-        Mock -CommandName Get-ChildItem -MockWith { 'TestDrive:\FakeDisk.vhd' }
+        Mock -CommandName Get-ChildItem -MockWith {
+            [PSCustomObject]@{
+                FullName = 'TestDrive:\FakeDisk.vhd'
+                Name     = 'FakeDisk.vhd'
+            }
+        }
         Mock -CommandName Test-FslDependencies -MockWith { $null }
         Mock -CommandName Dismount-FslDisk -MockWith { $null }
         Mock -CommandName Write-VhdOutput -MockWith { $null }
