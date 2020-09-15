@@ -39,7 +39,7 @@ Describe 'Invoke-FslShrinkDisk' {
         }
         Mock -CommandName Get-CimInstance -MockWith {
             [PSCustomObject]@{
-                NumberOfCores = 4
+                NumberOfLogicalProcessors = 4
             }
         }
         Mock -CommandName Get-ChildItem -MockWith {

@@ -1184,7 +1184,6 @@ function Optimize-OneDisk {
         }
 
 
-
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
@@ -1415,7 +1414,7 @@ function Write-VhdOutput {
         Write-Error $err
         return
     }
-    $numberOfCores = Get-CimInstance Win32_Processor | Select-Object -ExpandProperty NumberOfCores
+    $numberOfCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
 
@@ -1860,7 +1859,6 @@ function Optimize-OneDisk {
             $mount | DisMount-FslDisk
             return
         }
-
 
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
