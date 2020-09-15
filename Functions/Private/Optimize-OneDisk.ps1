@@ -127,16 +127,26 @@ function Optimize-OneDisk {
         Get-Volume -Partition $partInfo | Optimize-Volume
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-        try {
-            $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
-            $sizeMax = $partitionsize.SizeMax
+        $partSize = $false
+        $timespan = (Get-Date).AddSeconds(30)
+        while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+            try {
+                $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
+                $sizeMax = $partitionsize.SizeMax
+                $partSize = $true
+            }
+            catch {
+                $partSize = $false
+                Start-Sleep 0.1
+            }
         }
-        catch {
+
+        if ($partSize -eq $false) {
             Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
-
             return
         }
+
 
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
