@@ -120,7 +120,7 @@ function Optimize-OneDisk {
 
         if (($partInfo | Measure-Object).Count -eq 0) {
             $mount | DisMount-FslDisk
-            Write-VhdOutput -DiskState 'The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'No Partition Information - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             return
         }
 
@@ -131,7 +131,7 @@ function Optimize-OneDisk {
         $timespan = (Get-Date).AddSeconds(30)
         while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
             try {
-                $partitionsize = Get-PartitionSupportedSize -InputObject $partInfo -ErrorAction Stop
+                $partitionsize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
                 $sizeMax = $partitionsize.SizeMax
                 $partSize = $true
             }
@@ -142,7 +142,8 @@ function Optimize-OneDisk {
         }
 
         if ($partSize -eq $false) {
-            Write-VhdOutput -DiskState 'No Partition Supported Size Info' -EndTime (Get-Date)
+            Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
+            Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
