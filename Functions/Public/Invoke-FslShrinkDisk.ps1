@@ -224,7 +224,7 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
 
-    $diskList = $diskList | Where-Object {$_.Name -ne "Merge.vhdx"}
+    $diskList = $diskList | Where-Object { $_.Name -ne "Merge.vhdx" -or $_.Name -ne "RW.vhdx" }
 
     #If we can't find and files with the extension vhd or vhdx quit
     if ( ($diskList | Measure-Object).count -eq 0 ) {

@@ -148,6 +148,7 @@ function Mount-FslDisk {
                 Path       = $mountPath
                 DiskNumber = $mountedDisk.Number
                 ImagePath  = $mountedDisk.ImagePath
+                PartitionNumber = $partition.PartitionNumber
             }
             Write-Output $output
         }

@@ -124,14 +124,43 @@ function Optimize-OneDisk {
             return
         }
 
-        Get-Volume -Partition $partInfo | Optimize-Volume
-
-        #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-        $partSize = $false
-        $timespan = (Get-Date).AddSeconds(30)
-        while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+        $timespan = (Get-Date).AddSeconds(120)
+        $defrag = $false
+        while ($defrag -eq $false -and $timespan -gt (Get-Date)) {
             try {
-                $partitionsize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
+                Get-Volume -Partition $partInfo -ErrorAction Stop | Optimize-Volume -ErrorAction Stop
+                $defrag = $true
+            }
+            catch {
+                try {
+                    Get-Volume -ErrorAction Stop | Where-Object {
+                        $_.UniqueId -like "*$($partInfo.Guid)*"
+                        -or $_.Path -Like "*$($partInfo.Guid)*"
+                        -or $_.ObjectId -Like "*$($partInfo.Guid)*" } | Optimize-Volume -ErrorAction Stop
+                    $defrag = $true
+                }
+                catch {
+                    $defrag = $false
+                    Start-Sleep 0.1
+                }
+                $defrag = $false
+            }
+        }
+    }
+
+
+    #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
+    $partSize = $false
+    $timespan = (Get-Date).AddSeconds(30)
+    while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+        try {
+            $partitionsize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
+            $sizeMax = $partitionsize.SizeMax
+            $partSize = $true
+        }
+        catch {
+            try {
+                $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
                 $sizeMax = $partitionsize.SizeMax
                 $partSize = $true
             }
@@ -139,143 +168,146 @@ function Optimize-OneDisk {
                 $partSize = $false
                 Start-Sleep 0.1
             }
+            $partSize = $false
+
         }
+    }
 
-        if ($partSize -eq $false) {
-            Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
-            Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
-            return
-        }
-
-
-        #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-
-        if ( $partitionsize.SizeMin -gt $disk.Length ) {
-            Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
-            return
-        }
-
-
-        if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
-            return
-        }
-
-        #If I decide to add Hyper-V module support, I'll need this code later
-        if ($hyperv -eq $true) {
-
-            #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
-            $i = 0
-            $resize = $false
-            $targetSize = $partitionsize.SizeMin
-            $sizeBytesIncrement = 100 * 1024 * 1024
-
-            while ($i -le 5 -and $resize -eq $false) {
-
-                try {
-                    Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
-                    $resize = $true
-                }
-                catch {
-                    $resize = $false
-                    $targetSize = $targetSize + $sizeBytesIncrement
-                    $i++
-                }
-                finally {
-                    Start-Sleep 1
-                }
-            }
-
-            #Whatever happens now we need to dismount
-
-            if ($resize -eq $false) {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
-                $mount | DisMount-FslDisk
-                return
-            }
-        }
-
+    if ($partSize -eq $false) {
+        #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
+        Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
         $mount | DisMount-FslDisk
+        return
+    }
 
-        #Change the disk size and grab the new size
 
-        $retries = 0
-        $success = $false
-        #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
-        while ($retries -lt 30 -and $success -ne $true) {
+    #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
-            $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+    if ( $partitionsize.SizeMin -gt $disk.Length ) {
+        Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
+        $mount | DisMount-FslDisk
+        return
+    }
 
-            #Let's put diskpart into a function just so I can use Pester to Mock it
-            function invoke-diskpart ($Path) {
-                #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
-                #A better way would be to use optimize-vhd from the Hyper-V module,
-                #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
-                #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
-                #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though, it would be a way to solve localisation issues.
-                Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
-                Add-Content -Path $Path -Value 'attach vdisk readonly'
-                Add-Content -Path $Path -Value 'COMPACT VDISK'
-                Add-Content -Path $Path -Value 'detach vdisk'
-                $result = DISKPART /s $Path
-                Write-Output $result
-            }
 
-            $diskPartResult = invoke-diskpart -Path $tempFileName
+    if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
+        Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
+        $mount | DisMount-FslDisk
+        return
+    }
 
-            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
-            if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
-                $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
-                $success = $true
-                Remove-Item $tempFileName
-            }
-            else {
-                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
-                $retries++
-                #if DiskPart fails, try, try again.
-            }
-            Start-Sleep 1
-        }
+    #If I decide to add Hyper-V module support, I'll need this code later
+    if ($hyperv -eq $true) {
 
-        If ($success -ne $true) {
-            Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
-            Remove-Item $tempFileName
-            return
-        }
+        #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
+        $i = 0
+        $resize = $false
+        $targetSize = $partitionsize.SizeMin
+        $sizeBytesIncrement = 100 * 1024 * 1024
 
-        #If I decide to add Hyper-V module support, I'll need this code later
-        if ($hyperv -eq $true) {
-            #Now we need to reinflate the partition to its previous size
+        while ($i -le 5 -and $resize -eq $false) {
+
             try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-                Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
-                $paramWriteVhdOutput = @{
-                    DiskState = "Success"
-                    FinalSize = $finalSize
-                    EndTime   = Get-Date
-                }
-                Write-VhdOutput @paramWriteVhdOutput
+                Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
+                $resize = $true
             }
             catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
-                return
+                $resize = $false
+                $targetSize = $targetSize + $sizeBytesIncrement
+                $i++
             }
             finally {
-                $mount | DisMount-FslDisk
+                Start-Sleep 1
             }
         }
 
+        #Whatever happens now we need to dismount
 
-        $paramWriteVhdOutput = @{
-            DiskState = "Success"
-            FinalSize = $finalSize
-            EndTime   = Get-Date
+        if ($resize -eq $false) {
+            Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
+            $mount | DisMount-FslDisk
+            return
         }
-        Write-VhdOutput @paramWriteVhdOutput
-    } #Process
-    END { } #End
+    }
+
+    $mount | DisMount-FslDisk
+
+    #Change the disk size and grab the new size
+
+    $retries = 0
+    $success = $false
+    #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
+    while ($retries -lt 30 -and $success -ne $true) {
+
+        $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
+
+        #Let's put diskpart into a function just so I can use Pester to Mock it
+        function invoke-diskpart ($Path) {
+            #diskpart needs you to write a txt file so you can automate it, because apparently it's 1989.
+            #A better way would be to use optimize-vhd from the Hyper-V module,
+            #   but that only comes along with installing the actual role, which needs CPU virtualisation extensions present,
+            #   which is a PITA in cloud and virtualised environments where you can't do Hyper-V.
+            #MaybeDo, use hyper-V module if it's there if not use diskpart? two code paths to do the same thing probably not smart though, it would be a way to solve localisation issues.
+            Set-Content -Path $Path -Value "SELECT VDISK FILE=`'$($Disk.FullName)`'"
+            Add-Content -Path $Path -Value 'attach vdisk readonly'
+            Add-Content -Path $Path -Value 'COMPACT VDISK'
+            Add-Content -Path $Path -Value 'detach vdisk'
+            $result = DISKPART /s $Path
+            Write-Output $result
+        }
+
+        $diskPartResult = invoke-diskpart -Path $tempFileName
+
+        #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
+        if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
+            $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
+            $success = $true
+            Remove-Item $tempFileName
+        }
+        else {
+            Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
+            $retries++
+            #if DiskPart fails, try, try again.
+        }
+        Start-Sleep 1
+    }
+
+    If ($success -ne $true) {
+        Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
+        Remove-Item $tempFileName
+        return
+    }
+
+    #If I decide to add Hyper-V module support, I'll need this code later
+    if ($hyperv -eq $true) {
+        #Now we need to reinflate the partition to its previous size
+        try {
+            $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
+            Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
+            $paramWriteVhdOutput = @{
+                DiskState = "Success"
+                FinalSize = $finalSize
+                EndTime   = Get-Date
+            }
+            Write-VhdOutput @paramWriteVhdOutput
+        }
+        catch {
+            Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
+            return
+        }
+        finally {
+            $mount | DisMount-FslDisk
+        }
+    }
+
+
+    $paramWriteVhdOutput = @{
+        DiskState = "Success"
+        FinalSize = $finalSize
+        EndTime   = Get-Date
+    }
+    Write-VhdOutput @paramWriteVhdOutput
+} #Process
+END { } #End
 }  #function Optimize-OneDisk
