@@ -47,15 +47,19 @@ function Optimize-OneDisk {
         $hyperv = $false
     } # Begin
     PROCESS {
+        #In case there are disks left mounted let's try to clean up.
+        Dismount-DiskImage -ImagePath $Path -ErrorAction SilentlyContinue
+
+        #Get start time for logfile
         $startTime = Get-Date
         if ( $IgnoreLessThanGB ) {
             $IgnoreLessThanBytes = $IgnoreLessThanGB * 1024 * 1024 * 1024
         }
 
-        #Grab size of disk being porcessed
+        #Grab size of disk being processed
         $originalSize = $Disk.Length
 
-        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.  Calclations to be done in the output function, raw data goes in.
         $PSDefaultParameterValues = @{
             "Write-VhdOutput:Path"         = $LogFilePath
             "Write-VhdOutput:StartTime"    = $startTime
@@ -69,7 +73,7 @@ function Optimize-OneDisk {
 
         #Check it is a disk
         if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
-            Write-VhdOutput -DiskState 'FileIsNotDiskFormat' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx' -EndTime (Get-Date)
             return
         }
 
@@ -83,7 +87,7 @@ function Optimize-OneDisk {
                     Write-VhdOutput -DiskState "Deleted" -FinalSize 0 -EndTime (Get-Date)
                 }
                 catch {
-                    Write-VhdOutput -DiskState 'DiskDeletionFailed' -EndTime (Get-Date)
+                    Write-VhdOutput -DiskState 'Disk Deletion Failed' -EndTime (Get-Date)
                 }
                 return
             }
@@ -105,6 +109,7 @@ function Optimize-OneDisk {
             return
         }
 
+        #Grabbing partition info can fail when the client is under heavy load so.......
         $timespan = (Get-Date).AddSeconds(120)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
@@ -203,7 +208,6 @@ function Optimize-OneDisk {
             $sizeBytesIncrement = 100 * 1024 * 1024
 
             while ($i -le 5 -and $resize -eq $false) {
-
                 try {
                     Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
                     $resize = $true
