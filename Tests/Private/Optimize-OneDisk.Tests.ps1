@@ -135,7 +135,7 @@ Describe "Describing Optimize-OneDisk" {
                 RatioFreeSpace      = 0.2
             }
 
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'FileIsNotDiskFormat'
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx'
         }
     }
 
