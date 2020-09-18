@@ -923,6 +923,7 @@ function Mount-FslDisk {
                 Path       = $mountPath
                 DiskNumber = $mountedDisk.Number
                 ImagePath  = $mountedDisk.ImagePath
+                PartitionNumber = $partition.PartitionNumber
             }
             Write-Output $output
         }
@@ -1132,7 +1133,6 @@ function Optimize-OneDisk {
         }
 
         #Initial disk Mount
-
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 30 -PassThru -ErrorAction Stop
         }
@@ -1160,7 +1160,28 @@ function Optimize-OneDisk {
             return
         }
 
-        Get-Volume -Partition $partInfo | Optimize-Volume
+        $timespan = (Get-Date).AddSeconds(120)
+        $defrag = $false
+        while ($defrag -eq $false -and $timespan -gt (Get-Date)) {
+            try {
+                Get-Volume -Partition $partInfo -ErrorAction Stop | Optimize-Volume -ErrorAction Stop
+                $defrag = $true
+            }
+            catch {
+                try {
+                    Get-Volume -ErrorAction Stop | Where-Object {
+                        $_.UniqueId -like "*$($partInfo.Guid)*"
+                        -or $_.Path -Like "*$($partInfo.Guid)*"
+                        -or $_.ObjectId -Like "*$($partInfo.Guid)*" } | Optimize-Volume -ErrorAction Stop
+                    $defrag = $true
+                }
+                catch {
+                    $defrag = $false
+                    Start-Sleep 0.1
+                }
+                $defrag = $false
+            }
+        }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         $partSize = $false
@@ -1172,13 +1193,22 @@ function Optimize-OneDisk {
                 $partSize = $true
             }
             catch {
+                try {
+                    $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
+                    $sizeMax = $partitionsize.SizeMax
+                    $partSize = $true
+                }
+                catch {
+                    $partSize = $false
+                    Start-Sleep 0.1
+                }
                 $partSize = $false
-                Start-Sleep 0.1
+
             }
         }
 
         if ($partSize -eq $false) {
-            Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
+            #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
             Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
@@ -1440,7 +1470,7 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
 
-    $diskList = $diskList | Where-Object {$_.Name -ne "Merge.vhdx"}
+    $diskList = $diskList | Where-Object { $_.Name -ne "Merge.vhdx" -and $_.Name -ne "RW.vhdx" }
 
     #If we can't find and files with the extension vhd or vhdx quit
     if ( ($diskList | Measure-Object).count -eq 0 ) {
@@ -1603,6 +1633,7 @@ function Mount-FslDisk {
                 Path       = $mountPath
                 DiskNumber = $mountedDisk.Number
                 ImagePath  = $mountedDisk.ImagePath
+                PartitionNumber = $partition.PartitionNumber
             }
             Write-Output $output
         }
@@ -1810,7 +1841,6 @@ function Optimize-OneDisk {
         }
 
         #Initial disk Mount
-
         try {
             $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 30 -PassThru -ErrorAction Stop
         }
@@ -1838,7 +1868,28 @@ function Optimize-OneDisk {
             return
         }
 
-        Get-Volume -Partition $partInfo | Optimize-Volume
+        $timespan = (Get-Date).AddSeconds(120)
+        $defrag = $false
+        while ($defrag -eq $false -and $timespan -gt (Get-Date)) {
+            try {
+                Get-Volume -Partition $partInfo -ErrorAction Stop | Optimize-Volume -ErrorAction Stop
+                $defrag = $true
+            }
+            catch {
+                try {
+                    Get-Volume -ErrorAction Stop | Where-Object {
+                        $_.UniqueId -like "*$($partInfo.Guid)*"
+                        -or $_.Path -Like "*$($partInfo.Guid)*"
+                        -or $_.ObjectId -Like "*$($partInfo.Guid)*" } | Optimize-Volume -ErrorAction Stop
+                    $defrag = $true
+                }
+                catch {
+                    $defrag = $false
+                    Start-Sleep 0.1
+                }
+                $defrag = $false
+            }
+        }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         $partSize = $false
@@ -1850,13 +1901,22 @@ function Optimize-OneDisk {
                 $partSize = $true
             }
             catch {
+                try {
+                    $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
+                    $sizeMax = $partitionsize.SizeMax
+                    $partSize = $true
+                }
+                catch {
+                    $partSize = $false
+                    Start-Sleep 0.1
+                }
                 $partSize = $false
-                Start-Sleep 0.1
+
             }
         }
 
         if ($partSize -eq $false) {
-            Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
+            #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
             Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
