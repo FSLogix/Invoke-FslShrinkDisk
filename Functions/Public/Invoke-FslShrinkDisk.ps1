@@ -32,7 +32,7 @@
         FileIsNotDiskFormat		Disk file extension was not vhd or vhdx
         DiskDeletionFailed		Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted
         NoPartitionInfo			Could not get partition information for partition 1 from the disk
-        PartitionShrinkFailed		Failed to Shrink partition as part of the disk processing
+        PartitionShrinkFailed		Failed to Optimize partition as part of the disk processing
         DiskShrinkFailed		Could not shrink Disk
         PartitionSizeRestoreFailed 	Failed to Restore partition as part of the disk processing
 
@@ -164,12 +164,16 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
+    [ValidateRange(0,1)]
     [double]$RatioFreeSpace = 0.05
 )
 
 BEGIN {
     Set-StrictMode -Version Latest
     #Requires -RunAsAdministrator
+
+    #Test-FslDependencies
+    . .\Functions\Private\Test-FslDependencies.ps1
 
     #Invoke-Parallel - This is used to support powershell 5.x - if and when PoSh 7 and above become standard, move to ForEach-Object
     . .\Functions\Private\Invoke-Parallel.ps1
@@ -180,11 +184,28 @@ BEGIN {
     #Dismount-FslDisk
     . .\Functions\Private\Dismount-FslDisk.ps1
 
-    #Shrink-OneDisk
-    . .\Functions\Private\Shrink-OneDisk.ps1
+    #Optimize-OneDisk
+    . .\Functions\Private\Optimize-OneDisk.ps1
 
     #Write Output to file and optionally to pipeline
     . .\Functions\Private\Write-VhdOutput.ps1
+
+    $servicesToTest = 'defragsvc', 'vds'
+    try{
+        $servicesToTest | Test-FslDependencies -ErrorAction Stop
+    }
+    catch{
+        $err = $error[0]
+        Write-Error $err
+        return
+    }
+    $numberOfCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+
+    If (($ThrottleLimit / 2) -gt $numberOfCores) {
+
+        #$ThrottleLimit = $numberOfCores * 2
+        Write-Warning "Number of threads set to double the number of cores - $ThrottleLimit"
+    }
 
 } # Begin
 PROCESS {
@@ -200,8 +221,10 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path -Recurse
     }
     else {
-        $diskList = Get-ChildItem -File -Filter *.vhd* -Path $Path
+        $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
+
+    $diskList = $diskList | Where-Object { $_.Name -ne "Merge.vhdx" -and $_.Name -ne "RW.vhdx" }
 
     #If we can't find and files with the extension vhd or vhdx quit
     if ( ($diskList | Measure-Object).count -eq 0 ) {
@@ -217,12 +240,12 @@ PROCESS {
         . .\Functions\Private\Mount-FslDisk.ps1
         #Dismount-FslDisk
         . .\Functions\Private\Dismount-FslDisk.ps1
-        #Shrink-OneDisk
-        . .\Functions\Private\Shrink-OneDisk.ps1
+        #Optimize-OneDisk
+        . .\Functions\Private\Optimize-OneDisk.ps1
         #Write Output to file and optionally to pipeline
         . .\Functions\Private\Write-VhdOutput.ps1
 
-        $paramShrinkOneDisk = @{
+        $paramOptimizeOneDisk = @{
             Disk                = $_
             DeleteOlderThanDays = $using:DeleteOlderThanDays
             IgnoreLessThanGB    = $using:IgnoreLessThanGB
@@ -230,7 +253,7 @@ PROCESS {
             PassThru            = $using:PassThru
             RatioFreeSpace      = $using:RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramOptimizeOneDisk
 
     } #Scriptblock
 
@@ -238,7 +261,7 @@ PROCESS {
 
         $disk = $_
 
-        $paramShrinkOneDisk = @{
+        $paramOptimizeOneDisk = @{
             Disk                = $disk
             DeleteOlderThanDays = $DeleteOlderThanDays
             IgnoreLessThanGB    = $IgnoreLessThanGB
@@ -246,7 +269,7 @@ PROCESS {
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
         }
-        Shrink-OneDisk @paramShrinkOneDisk
+        Optimize-OneDisk @paramOptimizeOneDisk
 
     } #Scriptblock
 

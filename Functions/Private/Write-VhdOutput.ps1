@@ -20,22 +20,27 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$OriginalSizeGB,
+        [System.String]$OriginalSize,
 
         [Parameter(
             Mandatory = $true
         )]
-        [System.String]$FinalSizeGB,
-
-        [Parameter(
-            Mandatory = $true
-        )]
-        [System.String]$SpaceSavedGB,
+        [System.String]$FinalSize,
 
         [Parameter(
             Mandatory = $true
         )]
         [System.String]$FullName,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$StartTime,
+
+        [Parameter(
+            Mandatory = $true
+        )]
+        [datetime]$EndTime,
 
         [Parameter(
             Mandatory = $true
@@ -48,13 +53,17 @@ function Write-VhdOutput {
     } # Begin
     PROCESS {
 
+        #unit conversion and calculation should happen in output function
         $output = [PSCustomObject]@{
-            Name           = $Name
-            DiskState      = $DiskState
-            OriginalSizeGB = $OriginalSizeGB
-            FinalSizeGB    = $FinalSizeGB
-            SpaceSavedGB   = $SpaceSavedGB
-            FullName       = $FullName
+            Name             = $Name
+            StartTime        = $StartTime.ToLongTimeString()
+            EndTime          = $EndTime.ToLongTimeString()
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
+            DiskState        = $DiskState
+            OriginalSizeGB   = [math]::Round( $OriginalSize / 1GB, 2 )
+            FinalSizeGB      = [math]::Round( $FinalSize / 1GB, 2 )
+            SpaceSavedGB     = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
+            FullName         = $FullName
         }
 
         if ($Passthru) {
@@ -63,11 +72,11 @@ function Write-VhdOutput {
         $success = $False
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
-            try{
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop
+            try {
+                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation
                 $success = $true
             }
-            catch{
+            catch {
                 $retries++
             }
             Start-Sleep 1

@@ -12,6 +12,12 @@ function Mount-FslDisk {
         [System.String]$Path,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
+        )]
+        [Int]$TimeOut = 3,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$PassThru
@@ -25,8 +31,7 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            # Don't remove get-diskimage it's needed as mount doesn't give back the full object in certain circumstances
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop | Get-DiskImage
+            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
         }
         catch {
             $e = $error[0]
@@ -34,16 +39,64 @@ function Mount-FslDisk {
             return
         }
 
-        try {
-            # Get the first basic partition. Disks created with powershell will have a Reserved partition followed by the Basic
-            # partition. Those created with frx.exe will just have a single Basic partition.
-            $partition = Get-Partition -DiskNumber $mountedDisk.Number | Where-Object -Property 'Type' -eq -Value 'Basic'
+
+        $diskNumber = $false
+        $timespan = (Get-Date).AddSeconds($TimeOut)
+        while ($diskNumber -eq $false -and $timespan -gt (Get-Date)) {
+            Start-Sleep 0.1
+            try {
+                $mountedDisk = Get-DiskImage -ImagePath $Path
+                if ($mountedDisk.Number) {
+                    $diskNumber = $true
+                }
+            }
+            catch {
+                $diskNumber = $false
+            }
+
         }
-        catch {
-            $e = $error[0]
-            # Cleanup
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
-            Write-Error "Failed to read partition information for disk - `"$e`""
+
+        if ($diskNumber -eq $false) {
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount Disk Due to no Disknumber'
+            }
+            Write-Error 'Cannot get mount information'
+            return
+        }
+
+        $partitionType = $false
+        $timespan = (Get-Date).AddSeconds($TimeOut)
+        while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
+
+            try {
+                $allPartition = Get-Partition -DiskNumber $mountedDisk.Number -ErrorAction Stop
+
+                if ($allPartition.Type -contains 'Basic') {
+                    $partitionType = $true
+                    $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                }
+            }
+            catch {
+                if (($allPartition | Measure-Object).Count -gt 0) {
+                    $partition = $allPartition | Select-Object -Last 1
+                    $partitionType = $true
+                }
+                else{
+
+                    $partitionType = $false
+                }
+
+            }
+            Start-Sleep 0.1
+        }
+
+        if ($partitionType -eq $false) {
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error 'Could not dismount disk with no partition'
+            }
+            Write-Error 'Cannot get partition information'
             return
         }
 
@@ -59,7 +112,10 @@ function Mount-FslDisk {
         catch {
             $e = $error[0]
             # Cleanup
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no folder could be created - `"$e`""
+            }
             Write-Error "Failed to create mounting directory - `"$e`""
             return
         }
@@ -78,7 +134,10 @@ function Mount-FslDisk {
             $e = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
-            $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            catch {
+                Write-Error "Could not dismount disk when no junction point could be created - `"$e`""
+            }
             Write-Error "Failed to create junction point to - `"$e`""
             return
         }
@@ -89,6 +148,7 @@ function Mount-FslDisk {
                 Path       = $mountPath
                 DiskNumber = $mountedDisk.Number
                 ImagePath  = $mountedDisk.ImagePath
+                PartitionNumber = $partition.PartitionNumber
             }
             Write-Output $output
         }
