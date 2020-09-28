@@ -141,4 +141,4 @@ This shrinks all disks in the specified share recursively while not processing d
 This does all of the above examples, but together.
 
 ## .LINK
-<https://github.com/FSLogix/Invoke-FslShrinkDisk.ps1/>
+<https://github.com/FSLogix/Invoke-FslShrinkDisk/>
