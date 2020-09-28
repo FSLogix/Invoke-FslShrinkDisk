@@ -1146,6 +1146,7 @@ function Optimize-OneDisk {
             return
         }
 
+        #Grabbing partition info can fail when the client is under heavy load so.......
         $timespan = (Get-Date).AddSeconds(120)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
@@ -1452,7 +1453,7 @@ function Write-VhdOutput {
 
     If (($ThrottleLimit / 2) -gt $numberOfCores) {
 
-        #$ThrottleLimit = $numberOfCores * 2
+        $ThrottleLimit = $numberOfCores * 2
         Write-Warning "Number of threads set to double the number of cores - $ThrottleLimit"
     }
 
@@ -1857,6 +1858,7 @@ function Optimize-OneDisk {
             return
         }
 
+        #Grabbing partition info can fail when the client is under heavy load so.......
         $timespan = (Get-Date).AddSeconds(120)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
