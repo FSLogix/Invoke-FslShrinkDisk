@@ -1,13 +1,15 @@
+# Invoke-FslShrinkDisk.ps1
+
 [![Build Status](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_apis/build/status/FSLogix.Invoke-FslShrinkDisk?branchName=master)](https://dev.azure.com/jimoyle/Invoke-FslShrinkDisk/_build/latest?definitionId=1&branchName=master)
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/725c8d2481044524b331d3b207971ddf)](https://www.codacy.com/gh/FSLogix/Invoke-FslShrinkDisk?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=FSLogix/Invoke-FslShrinkDisk&amp;utm_campaign=Badge_Grade)
 
-# Invoke-FslShrinkDisk.ps1
-
 ## .SYNOPSIS
+
 Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
 
 ## .DESCRIPTION
+
 FSLogix profile and O365 virtual hard disks are in the vhd or vhdx file format. By default, the disks created will be in Dynamically Expanding format rather than Fixed format.  This script does not support reducing the size of a Fixed file format.
 
 Dynamically Expanding disks do not natively shrink when the volume of data within them reduces, they stay at the 'High water mark' of historical data volume within them.
@@ -36,20 +38,21 @@ The script will output a csv in the following format:
 
 | DiskState | Meaning |
 |-----|-----|
-| Success		                | Disk has been successfully processed and shrunk |
-| Ignored		                | Disk was less than the size configured in -IgnoreLessThanGB parameter |
-| Deleted		                | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted |
-| DiskLocked	                | Disk could not be mounted due to being in use |
-| LessThan(x)%FreeInsideDisk    | Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
+| Success                  | Disk has been successfully processed and shrunk |
+| Ignored                  | Disk was less than the size configured in -IgnoreLessThanGB parameter |
+| Deleted                  | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was successfully deleted |
+| DiskLocked                | Disk could not be mounted due to being in use |
+| LessThan(x)%FreeInsideDisk| Disk contained less whitespace than configured in -RatioFreeSpace parameter and was ignored for processing |
 
 ### Possible Error values for DiskState are as follows
+
 | DiskState | Meaning |
 |-----|-----|
-| FileIsNotDiskFormat		    | Disk file extension was not vhd or vhdx  |
-| DiskDeletionFailed		    | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted |
-| NoPartitionInfo			    | Could not get partition information for partition 1 from the disk |
-| PartitionShrinkFailed		    | Failed to Shrink partition as part of the disk processing |
-| DiskShrinkFailed		        | Could not shrink Disk |
+| FileIsNotDiskFormat           | Disk file extension was not vhd or vhdx  |
+| DiskDeletionFailed            | Disk was last accessed before the number of days configured in the -DeleteOlderThanDays parameter and was not successfully deleted |
+| NoPartitionInfo               | Could not get partition information for partition 1 from the disk |
+| PartitionShrinkFailed         | Failed to Shrink partition as part of the disk processing |
+| DiskShrinkFailed              | Could not shrink Disk |
 | PartitionSizeRestoreFailed    | Failed to Restore partition as part of the disk processing |
 
 If the diskstate shows an error value from the list above, manual intervention may be required to make the disk usable again.
@@ -87,7 +90,6 @@ Returns an object representing the item with which you are working. By default, 
 Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
 ## .PARAMETER RatioFreeSpace
-
 The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05. This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
 
 ## .INPUTS

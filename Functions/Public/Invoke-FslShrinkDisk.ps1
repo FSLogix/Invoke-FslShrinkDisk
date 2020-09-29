@@ -171,6 +171,7 @@ Param (
 BEGIN {
     Set-StrictMode -Version Latest
     #Requires -RunAsAdministrator
+    #Requires -Version 5.1
 
     #Test-FslDependencies
     . .\Functions\Private\Test-FslDependencies.ps1
