@@ -114,7 +114,10 @@ function Optimize-OneDisk {
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
             try {
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object {$_.Type -eq 'Basic' -or $_.Type -eq 'IFS'} -ErrorAction Stop
+                if ($partinfo.Type -eq 'IFS') {
+                    Write-Warning 'Disk is not created by FSLogix, this tool is designed for FSlogix disks'
+                }
             }
             catch {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction SilentlyContinue | Select-Object -Last 1
@@ -165,7 +168,7 @@ function Optimize-OneDisk {
                 if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*") {
                     Get-Volume -Partition $partInfo -ErrorAction SilentlyContinue | Repair-Volume | Out-Null
                 }
-                
+
                 try {
                     $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
                     $sizeMax = $partitionsize.SizeMax
