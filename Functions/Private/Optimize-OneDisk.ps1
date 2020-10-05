@@ -44,7 +44,6 @@ function Optimize-OneDisk {
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
-        $hyperv = $false
     } # Begin
     PROCESS {
         #In case there are disks left mounted let's try to clean up.
@@ -116,7 +115,7 @@ function Optimize-OneDisk {
             try {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object {$_.Type -eq 'Basic' -or $_.Type -eq 'IFS'} -ErrorAction Stop
                 if ($partinfo.Type -eq 'IFS') {
-                    Write-Warning 'Disk is not created by FSLogix, this tool is designed for FSlogix disks'
+                    Write-Warning 'Disk is not created by FSLogix, this tool is designed for FSLogix disks'
                 }
             }
             catch {
@@ -206,39 +205,6 @@ function Optimize-OneDisk {
             return
         }
 
-        #If I decide to add Hyper-V module support, I'll need this code later
-        if ($hyperv -eq $true) {
-
-            #In some cases you can't do the partition shrink to the min so increasing by 100 MB each time till it shrinks
-            $i = 0
-            $resize = $false
-            $targetSize = $partitionsize.SizeMin
-            $sizeBytesIncrement = 100 * 1024 * 1024
-
-            while ($i -le 5 -and $resize -eq $false) {
-                try {
-                    Resize-Partition -InputObject $partInfo -Size $targetSize -ErrorAction Stop
-                    $resize = $true
-                }
-                catch {
-                    $resize = $false
-                    $targetSize = $targetSize + $sizeBytesIncrement
-                    $i++
-                }
-                finally {
-                    Start-Sleep 1
-                }
-            }
-
-            #Whatever happens now we need to dismount
-
-            if ($resize -eq $false) {
-                Write-VhdOutput -DiskState "PartitionShrinkFailed" -EndTime (Get-Date)
-                $mount | DisMount-FslDisk
-                return
-            }
-        }
-
         $mount | DisMount-FslDisk
 
         #Change the disk size and grab the new size
@@ -286,30 +252,6 @@ function Optimize-OneDisk {
             Remove-Item $tempFileName
             return
         }
-
-        #If I decide to add Hyper-V module support, I'll need this code later
-        if ($hyperv -eq $true) {
-            #Now we need to reinflate the partition to its previous size
-            try {
-                $mount = Mount-FslDisk -Path $Disk.FullName -PassThru
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber | Where-Object -Property 'Type' -EQ -Value 'Basic'
-                Resize-Partition -InputObject $partInfo -Size $sizeMax -ErrorAction Stop
-                $paramWriteVhdOutput = @{
-                    DiskState = "Success"
-                    FinalSize = $finalSize
-                    EndTime   = Get-Date
-                }
-                Write-VhdOutput @paramWriteVhdOutput
-            }
-            catch {
-                Write-VhdOutput -DiskState "PartitionSizeRestoreFailed" -EndTime (Get-Date)
-                return
-            }
-            finally {
-                $mount | DisMount-FslDisk
-            }
-        }
-
 
         $paramWriteVhdOutput = @{
             DiskState = "Success"
