@@ -161,6 +161,11 @@ function Optimize-OneDisk {
                 $partSize = $true
             }
             catch {
+                $e = $error[0]
+                if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*") {
+                    Get-Volume -Partition $partInfo -ErrorAction SilentlyContinue | Repair-Volume | Out-Null
+                }
+                
                 try {
                     $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
                     $sizeMax = $partitionsize.SizeMax
