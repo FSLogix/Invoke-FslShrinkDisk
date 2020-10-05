@@ -233,7 +233,7 @@ function Optimize-OneDisk {
 
             $diskPartResult = invoke-diskpart -Path $tempFileName
 
-            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
+            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.  Currently only works in English
             if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
                 $success = $true
