@@ -44,6 +44,13 @@ function Optimize-OneDisk {
     BEGIN {
         #Requires -RunAsAdministrator
         Set-StrictMode -Version Latest
+
+        #Diskpart will output the system language to the console if it can, otherwise default to english, I've found 4 languages it can use as output (including english) there may be more
+        $diskPartLang = 'DiskPart successfully compacted the virtual disk file.',
+        'DiskPart a correctement compacté le fichier de disque virtuel.',
+        'DiskPart compactó correctamente el archivo de disco virtual.',
+        'Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich komprimiert.'
+
     } # Begin
     PROCESS {
         #In case there are disks left mounted let's try to clean up.
@@ -113,7 +120,7 @@ function Optimize-OneDisk {
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
             try {
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object {$_.Type -eq 'Basic' -or $_.Type -eq 'IFS'} -ErrorAction Stop
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object { $_.Type -eq 'Basic' -or $_.Type -eq 'IFS' } -ErrorAction Stop
                 if ($partinfo.Type -eq 'IFS') {
                     Write-Warning 'Disk is not created by FSLogix, this tool is designed for FSLogix disks'
                 }
@@ -233,8 +240,17 @@ function Optimize-OneDisk {
 
             $diskPartResult = invoke-diskpart -Path $tempFileName
 
-            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.  Currently only works in English
-            if ($diskPartResult -contains 'DiskPart successfully compacted the virtual disk file.') {
+            #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
+            $diskPartFlag = $false
+            
+            #using the success lines for different languages defined in the begin block test for success
+            foreach ($langString in $diskPartLang) {
+                if ($diskPartResult -contains $langString) {
+                    $diskPartFlag = $true
+                }               
+            }
+
+            if ($diskPartFlag) {
                 $finalSize = Get-ChildItem $Disk.FullName | Select-Object -ExpandProperty Length
                 $success = $true
                 Remove-Item $tempFileName
