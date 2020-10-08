@@ -1,0 +1,22 @@
+
+Microsoft DiskPart version 10.0.19041.1
+
+Copyright (C) Microsoft Corporation.
+On computer: WINDEV2008EVAL
+
+DiskPart successfully selected the virtual disk file.
+
+
+  100 percent completed
+
+
+DiskPart successfully attached the virtual disk file.
+
+
+    0 percent completed
+  100 percent completed
+
+
+DiskPart successfully compacted the virtual disk file.
+
+DiskPart successfully detached the virtual disk file.

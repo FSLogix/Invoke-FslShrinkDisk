@@ -1,0 +1,22 @@
+
+Microsoft DiskPart version 10.0.19041.1
+
+Copyright (C) Microsoft Corporation.
+Sur l'ordinateur : WINDEV2008EVAL
+
+DiskPart a correctement sélectionné le fichier de disque virtuel.
+
+
+  100 pour cent effectués
+
+
+DiskPart a correctement attaché le fichier de disque virtuel.
+
+
+    0 pour cent effectués
+  100 pour cent effectués
+
+
+DiskPart a correctement compacté le fichier de disque virtuel.
+
+DiskPart a correctement détaché le fichier de disque virtuel.

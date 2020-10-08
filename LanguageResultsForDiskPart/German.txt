@@ -1,0 +1,21 @@
+Microsoft DiskPart-Version 10.0.19041.1
+
+Copyright (C) Microsoft Corporation.
+Auf Computer: WINDEV2008EVAL
+
+Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich ausgewählt.
+
+
+  100 Prozent bearbeitet
+
+
+Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich angefügt.
+
+
+    0 Prozent bearbeitet
+  100 Prozent bearbeitet
+
+
+Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich komprimiert.
+
+Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich getrennt.

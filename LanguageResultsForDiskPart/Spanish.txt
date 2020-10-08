@@ -1,0 +1,22 @@
+
+Microsoft DiskPart versión 10.0.19041.1
+
+Copyright (C) Microsoft Corporation.
+En el equipo: WINDEV2008EVAL
+
+DiskPart seleccionó correctamente el archivo de disco virtual.
+
+
+  100 por ciento completado
+
+
+DiskPart expuso correctamente el archivo de disco virtual.
+
+
+   10 por ciento completado
+  100 por ciento completado
+
+
+DiskPart compactó correctamente el archivo de disco virtual.
+
+DiskPart ocultó correctamente el archivo de disco virtual.
