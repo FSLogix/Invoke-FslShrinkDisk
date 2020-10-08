@@ -32,6 +32,11 @@ function Optimize-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
+        [int]$GeneralTimeout = 120,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
         [string]$LogFilePath = "$env:TEMP\FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv",
 
         [Parameter(
@@ -54,7 +59,7 @@ function Optimize-OneDisk {
     } # Begin
     PROCESS {
         #In case there are disks left mounted let's try to clean up.
-        Dismount-DiskImage -ImagePath $Disk -ErrorAction SilentlyContinue
+        Dismount-DiskImage -ImagePath $Disk.FullName -ErrorAction SilentlyContinue
 
         #Get start time for logfile
         $startTime = Get-Date
@@ -107,7 +112,7 @@ function Optimize-OneDisk {
 
         #Initial disk Mount
         try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut 30 -PassThru -ErrorAction Stop
+            $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut $MountTimeout -PassThru -ErrorAction Stop
         }
         catch {
             $err = $error[0]
@@ -116,7 +121,7 @@ function Optimize-OneDisk {
         }
 
         #Grabbing partition info can fail when the client is under heavy load so.......
-        $timespan = (Get-Date).AddSeconds(120)
+        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
             try {
@@ -137,36 +142,45 @@ function Optimize-OneDisk {
             return
         }
 
-        $timespan = (Get-Date).AddSeconds(120)
+        #Try and defragment the disk
+        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
         $defrag = $false
         while ($defrag -eq $false -and $timespan -gt (Get-Date)) {
             try {
-                Get-Volume -Partition $partInfo -ErrorAction Stop | Optimize-Volume -ErrorAction Stop
+                $vol = Get-Volume -Partition $partInfo -ErrorAction Stop 
+                $vol | Optimize-Volume -ErrorAction Stop
                 $defrag = $true
             }
             catch {
                 try {
-                    Get-Volume -ErrorAction Stop | Where-Object {
-                        $_.UniqueId -like "*$($partInfo.Guid)*"
-                        -or $_.Path -Like "*$($partInfo.Guid)*"
-                        -or $_.ObjectId -Like "*$($partInfo.Guid)*" } | Optimize-Volume -ErrorAction Stop
+                    $volObjId = Get-Volume -ErrorAction Stop | Where-Object {
+                        $_.UniqueId -like "*$($partInfo.Guid)*" -or 
+                        $_.Path -Like "*$($partInfo.Guid)*" -or 
+                        $_.ObjectId -Like "*$($partInfo.Guid)*" } | Select-Object -Property 'ObjectId' 
+
+                    Optimize-Volume -ObjectId $volObjId.ObjectId -ErrorAction Stop | Out-Null
+                            
                     $defrag = $true
                 }
                 catch {
                     $defrag = $false
                     Start-Sleep 0.1
                 }
-                $defrag = $false
             }
+        }
+
+        if ($defrag -eq $false) {
+            Write-VhdOutput -DiskState 'Defragmentation of the disk failed' -EndTime (Get-Date)
+            $mount | DisMount-FslDisk
+            return
         }
 
         #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
         $partSize = $false
-        $timespan = (Get-Date).AddSeconds(30)
+        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
         while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
             try {
                 $partitionsize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
-                $sizeMax = $partitionsize.SizeMax
                 $partSize = $true
             }
             catch {
@@ -177,21 +191,18 @@ function Optimize-OneDisk {
 
                 try {
                     $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
-                    $sizeMax = $partitionsize.SizeMax
                     $partSize = $true
                 }
                 catch {
                     $partSize = $false
                     Start-Sleep 0.1
                 }
-                $partSize = $false
-
             }
         }
 
         if ($partSize -eq $false) {
             #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
-            Write-VhdOutput -DiskState 'No Partition Supported Size Info - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'No Supported Size Info for partition - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }

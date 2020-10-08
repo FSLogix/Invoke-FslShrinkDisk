@@ -1,4 +1,6 @@
+
 BeforeAll {
+    
     $here = Split-Path -Parent $PSCommandPath
     $funcType = Split-Path $here -Leaf
     $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'
@@ -12,7 +14,6 @@ BeforeAll {
 
     #Adding enpty function so that the mock works
     function invoke-diskpart ($Path) {
-
     }
 
 }
@@ -22,9 +23,10 @@ BeforeAll {
 Describe "Describing Optimize-OneDisk" {
 
     BeforeAll {
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
-        $disk = New-Item testdrive:\fakedisk.vhdx | Get-ChildItem
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+
+        Copy-Item "$here\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
+        $disk = Get-ChildItem "Testdrive:\notdisk.vhdx"
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function', Target = '*')]
         $notDisk = New-Item testdrive:\fakeextension.vhdx.txt | Get-ChildItem
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $DeleteOlderThanDays = 90
@@ -32,16 +34,28 @@ Describe "Describing Optimize-OneDisk" {
         $IgnoreLessThanGB = $null
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $LogFilePath = 'TestDrive:\log.csv'
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $guid = '129c832f-846f-4937-bb64-2d456d2c7d04'
         $SizeMax = 4668260352
+        $SizeMin = 1
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $english = Get-Content "$here\LanguageResultsForDiskPart\English.txt"
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $french = Get-Content "$here\LanguageResultsForDiskPart\French.txt"
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $spanish = Get-Content "$here\LanguageResultsForDiskPart\Spanish.txt"
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $german = Get-Content "$here\LanguageResultsForDiskPart\German.txt"
 
         Mock -CommandName Mount-FslDisk -MockWith { [PSCustomObject]@{
-                Path       = 'TestDrive:\nothere.vhdx'
-                DiskNumber = 4
-                ImagePath  = 'Testdrive:\nopath'
+                Path            = 'TestDrive:\nothere.vhdx'
+                DiskNumber      = 4
+                ImagePath       = 'Testdrive:\nopath'
+                PartitionNumber = 1
             }
         }
         Mock -CommandName Get-PartitionSupportedSize -MockWith { [PSCustomObject]@{
-                SizeMin = 3379200645
+                SizeMin = $SizeMin
                 SizeMax = $SizeMax
             }
         }
@@ -51,12 +65,11 @@ Describe "Describing Optimize-OneDisk" {
         Mock -CommandName Resize-Partition -MockWith { $null }
         Mock -CommandName DisMount-FslDisk -MockWith { $null }
         Mock -CommandName Start-Sleep -MockWith { $null }
+        Mock -CommandName invoke-diskpart -MockWith { $english }
     }
 
-
-
     Context "Input" {
-        BeforeAll{
+        BeforeAll {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
             $paramShrinkOneDisk = @{
                 Disk                = $notdisk
@@ -151,6 +164,42 @@ Describe "Describing Optimize-OneDisk" {
             }
 
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Ignored'
+        }
+    }
+
+    Context "Works in French" {
+
+        It "Works in French" -tag 'new' {
+            Mock -CommandName invoke-diskpart -MockWith { $french }
+            Mock -CommandName Get-Partition -MockWith { [PSCustomObject]@{
+                    Type            = 'Basic'
+                    Guid            = $guid
+                    DiskNumber      = 6
+                    PartitionNumber = 8
+                } }
+            Mock -CommandName Get-PartitionSupportedSize -MockWith {
+                [PSCustomObject]@{
+                    SizeMin = $SizeMin
+                    SizeMax = $SizeMax
+                }
+            }
+            Mock -CommandName Get-Volume -MockWith { [PSCustomObject]@{
+                    Path     = $guid
+                    UniqueId = $guid
+                    ObjectId = $guid
+                } }
+            Mock -CommandName Optimize-Volume -MockWith { 'test' }
+
+            $paramShrinkOneDisk = @{
+                Disk                = $Disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+                Passthru            = $true
+                GeneralTimeout      = 60
+            }
+            Optimize-OneDisk @paramShrinkOneDisk | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
     }
 
@@ -258,7 +307,7 @@ Describe "Describing Optimize-OneDisk" {
     }
 
     Context "Output" {
-        BeforeAll{
+        BeforeAll {
             Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -eq $SizeMax }
             Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
 
