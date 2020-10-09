@@ -24,7 +24,7 @@ Describe "Describing Optimize-OneDisk" {
 
     BeforeAll {
 
-        Copy-Item "$here\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
+moved         Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
         $disk = Get-ChildItem "Testdrive:\notdisk.vhdx"
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function', Target = '*')]
         $notDisk = New-Item testdrive:\fakeextension.vhdx.txt | Get-ChildItem
@@ -39,13 +39,13 @@ Describe "Describing Optimize-OneDisk" {
         $SizeMax = 4668260352
         $SizeMin = 1
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
-        $english = Get-Content "$here\LanguageResultsForDiskPart\English.txt"
+        $english = Get-Content "$here\Tests\LanguageResultsForDiskPart\English.txt"
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
-        $french = Get-Content "$here\LanguageResultsForDiskPart\French.txt"
+        $french = Get-Content "$here\Tests\LanguageResultsForDiskPart\French.txt"
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
-        $spanish = Get-Content "$here\LanguageResultsForDiskPart\Spanish.txt"
+        $spanish = Get-Content "$here\Tests\LanguageResultsForDiskPart\Spanish.txt"
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
-        $german = Get-Content "$here\LanguageResultsForDiskPart\German.txt"
+        $german = Get-Content "$here\Tests\LanguageResultsForDiskPart\German.txt"
 
         Mock -CommandName Mount-FslDisk -MockWith { [PSCustomObject]@{
                 Path            = 'TestDrive:\nothere.vhdx'
