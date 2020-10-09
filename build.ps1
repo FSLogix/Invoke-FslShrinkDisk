@@ -41,7 +41,7 @@ function Add-FslRelease {
     }
     $ctrlScript | Set-Content $ReleaseFile
 }
-$path = 'D:\PoShCode\GitHub\Invoke-FslShrinkDisk'
+$path = 'C:\PoShCode\Invoke-FslShrinkDisk'
 $p = @{
 
     FunctionsFolder = Join-Path $path 'Functions\Private'
