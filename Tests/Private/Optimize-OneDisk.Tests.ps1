@@ -24,7 +24,7 @@ Describe "Describing Optimize-OneDisk" {
 
     BeforeAll {
 
-moved         Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
+        Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
         $disk = Get-ChildItem "Testdrive:\notdisk.vhdx"
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function', Target = '*')]
         $notDisk = New-Item testdrive:\fakeextension.vhdx.txt | Get-ChildItem
