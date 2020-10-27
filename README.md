@@ -83,7 +83,7 @@ All disk actions will be saved in a csv file for admin reference.  The default l
 ## .PARAMETER PassThru
 Returns an object representing the item with which you are working. By default, this cmdlet does not generate any pipeline output.
 
-### .PARAMETER ThrottleLimit
+## .PARAMETER ThrottleLimit
 Specifies the number of disks that will be processed at a time. Further disks in the queue will wait till a previous disk has finished up to a maximum of the ThrottleLimit.  The  default value is 8.
 
 ## .PARAMETER RatioFreeSpace
