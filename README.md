@@ -90,6 +90,9 @@ Specifies the number of disks that will be processed at a time. Further disks in
 
 The minimum percentage of white space in the disk before processing will start as a decimal between 0 and 1 eg 0.2 is 20% 0.65 is 65%. The Default is 0.05. This means that if the available size reduction is less than 5%, then no action will be taken.  To try and shrink all files no matter how little the gain set this to 0.
 
+## .PARAMETER VHDNamePattern
+A regex pattern to filter which VHD(X) files to target in the specified folder. For example '^[a-d]' would only work on ones that start with letters a to d.
+
 ## .INPUTS
 You can pipe the path into the command which is recognised by type, you can also pipe any parameter by name. It will also take the path positionally
 
