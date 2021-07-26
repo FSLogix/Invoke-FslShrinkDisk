@@ -12,6 +12,7 @@ SetupTestManyThreads.ps1
 SetupTest.ps1
 langtest.ps1
 testmultithread.ps1
+startlog.ps1
 
 # Test results
 CodeCoverage.xml

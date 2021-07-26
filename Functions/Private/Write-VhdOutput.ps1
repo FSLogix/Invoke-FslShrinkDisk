@@ -45,7 +45,11 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
-        [Switch]$Passthru
+        [Switch]$Passthru,
+
+        [Parameter(
+        )]
+        [Switch]$JSONFormat
     )
 
     BEGIN {
@@ -54,7 +58,7 @@ function Write-VhdOutput {
     PROCESS {
 
         #unit conversion and calculation should happen in output function
-        $output = [PSCustomObject]@{
+        $csvOutput = [PSCustomObject]@{
             Name             = $Name
             StartTime        = $StartTime.ToLongTimeString()
             EndTime          = $EndTime.ToLongTimeString()
@@ -66,22 +70,46 @@ function Write-VhdOutput {
             FullName         = $FullName
         }
 
+        #JSON output is meant to be machine readable so times are changed to timestamps and sizes left in Bytes
+        $jsonOutput = [PSCustomObject][Ordered]@{
+            Name             = $Name
+            StartTime        = $StartTime.GetDateTimeFormats()[18]
+            EndTime          = $EndTime.GetDateTimeFormats()[18]
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 3)
+            DiskState        = $DiskState
+            OriginalSizeGB   = $OriginalSize
+            FinalSizeGB      = $FinalSize
+            SpaceSavedGB     = $OriginalSize - $FinalSize
+            FullName         = $FullName
+        }
+
         if ($Passthru) {
-            Write-Output $output
+            if ($JSONFormat) {
+                Write-Output $jsonOutput
+            }
+            else {
+                Write-Output $csvOutput
+            }
         }
         $success = $False
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
             try {
-                $output | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation
+                if ($JSONFormat){
+                    $logMessage = $jsonOutput | ConvertTo-Json -Compress
+                    $logMessage | Set-Content -Path $Path
+                }
+                else{
+                    $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
+                }
+
                 $success = $true
             }
             catch {
                 $retries++
+                Start-Sleep 1
             }
-            Start-Sleep 1
         }
-
 
     } #Process
     END { } #End
