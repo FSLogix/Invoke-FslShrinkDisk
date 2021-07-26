@@ -75,11 +75,11 @@ function Write-VhdOutput {
             Name             = $Name
             StartTime        = $StartTime.GetDateTimeFormats()[18]
             EndTime          = $EndTime.GetDateTimeFormats()[18]
-            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 3)
+            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 7)
             DiskState        = $DiskState
-            OriginalSizeGB   = $OriginalSize
-            FinalSizeGB      = $FinalSize
-            SpaceSavedGB     = $OriginalSize - $FinalSize
+            OriginalSize     = $OriginalSize
+            FinalSize        = $FinalSize
+            SpaceSaved       = $OriginalSize - $FinalSize
             FullName         = $FullName
         }
 
@@ -95,11 +95,11 @@ function Write-VhdOutput {
         $retries = 0
         while ($retries -lt 10 -and $success -ne $true) {
             try {
-                if ($JSONFormat){
+                if ($JSONFormat) {
                     $logMessage = $jsonOutput | ConvertTo-Json -Compress
                     $logMessage | Set-Content -Path $Path
                 }
-                else{
+                else {
                     $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
                 }
 
