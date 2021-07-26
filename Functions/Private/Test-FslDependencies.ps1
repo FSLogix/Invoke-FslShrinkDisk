@@ -27,8 +27,9 @@ Function Test-FslDependencies {
 
             Start-Service -Name $svc | Out-Null
 
-            if ((Get-Service -Name $svc).Status -ne 'Running') {
-                Write-Error "Can not start $svcObject.DisplayName"
+            #Using displayname as it makes it easier to mock the different get-service commands in Pester
+            if ((Get-Service -DisplayName $svcObject.DisplayName).Status -ne 'Running') {
+                Write-Error "Can not start $($svcObject.DisplayName)"
             }
         }
     }

@@ -52,11 +52,26 @@ Describe "Describing Test-FslDependencies" {
                     StartType   = "Disabled"
                     DisplayName = 'Blah'
                 }
+            } -ParameterFilter { $Name }
+
+            Mock -CommandName Get-Service -MockWith {
+                [PSCustomObject]@{
+                    Status      = "Stopped"
+                    StartType   = "Manual"
+                    DisplayName = 'Blah'
+                }
+            } -ParameterFilter { $DisplayName }
+
+            Mock -CommandName Set-Service -MockWith {
+                $null
+            }
+            Mock -CommandName Start-Service -MockWith {
+                $null
             }
         }
 
-        It "Sets to manual" -Skip {
-            Test-FslDependencies -Name NullService | Should -BeNullOrEmpty
+        It "Sets to manual" {
+            {Test-FslDependencies -Name NullService -ErrorAction Stop } | Should -Throw -ExpectedMessage 'Can not start Blah'
         }
     }
 }
