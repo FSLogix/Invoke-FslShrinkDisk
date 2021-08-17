@@ -191,7 +191,7 @@ BEGIN {
     #Write Output to file and optionally to pipeline
     . .\Functions\Private\Write-VhdOutput.ps1
 
-    $servicesToTest = 'defragsvc', 'vds'
+    $servicesToTest = 'defragsvc', 'vds', 'smphost'
     try{
         $servicesToTest | Test-FslDependencies -ErrorAction Stop
     }
