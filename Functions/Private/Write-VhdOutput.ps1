@@ -94,7 +94,7 @@ function Write-VhdOutput {
 
         if ($JSONFormat) {
             $logMessage = $jsonOutput | ConvertTo-Json -Compress
-            $logMessage | Add-Content -Path $Path
+            $logMessage | Add-Content -Path $Path -ErrorAction Stop
         }
         else {
             $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
