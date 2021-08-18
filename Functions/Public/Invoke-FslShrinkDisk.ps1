@@ -164,8 +164,13 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [ValidateRange(0,1)]
-    [double]$RatioFreeSpace = 0.05
+    [ValidateRange(0, 1)]
+    [double]$RatioFreeSpace = 0.05,
+
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [Switch]$JSONFormat
 )
 
 BEGIN {
@@ -192,10 +197,10 @@ BEGIN {
     . .\Functions\Private\Write-VhdOutput.ps1
 
     $servicesToTest = 'defragsvc', 'vds', 'smphost'
-    try{
+    try {
         $servicesToTest | Test-FslDependencies -ErrorAction Stop
     }
-    catch{
+    catch {
         $err = $error[0]
         Write-Error $err
         return
@@ -206,6 +211,17 @@ BEGIN {
 
         $ThrottleLimit = $numberOfCores * 2
         Write-Warning "Number of threads (ThrotttleLimit) has been changed to double the number of cores - $ThrottleLimit"
+    }
+
+    If ($ThrottleLimit -lt $numberOfCores) {
+        Write-Information "Number of threads (ThrotttleLimit) can be used ton this system to speed up processing"
+    }
+
+    if (Test-Path $LogFilePath) {
+        $pth = Get-Item $LogFilePath
+        if ($pth.Attributes = 'Directory') {
+            $LogFilePath = Join-Path $LogFilePath "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv"
+        }
     }
 
 } # Begin
