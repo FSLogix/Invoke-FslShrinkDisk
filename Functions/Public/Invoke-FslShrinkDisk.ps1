@@ -159,7 +159,7 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [int]$ThrottleLimit = 8,
+    [int]$ThrottleLimit,
 
     [Parameter(
         ValuefromPipelineByPropertyName = $true
@@ -205,16 +205,24 @@ BEGIN {
         Write-Error $err
         return
     }
+
     $numberOfCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
-    If (($ThrottleLimit / 2) -gt $numberOfCores) {
-
-        $ThrottleLimit = $numberOfCores * 2
-        Write-Warning "Number of threads (ThrotttleLimit) has been changed to double the number of cores - $ThrottleLimit"
-    }
-
-    If ($ThrottleLimit -lt $numberOfCores) {
-        Write-Information "Number of threads (ThrotttleLimit) can be used ton this system to speed up processing"
+    switch ($true) {
+        (-not ($ThrottleLimit)) {
+            $ThrottleLimit = $numberOfCores * 2
+            Write-Information "Throttle limit set to $ThrottleLimit"
+            break
+        }
+        (($ThrottleLimit / 2) -gt $numberOfCores) {
+            $ThrottleLimit = $numberOfCores * 2
+            Write-Warning "Number of threads (ThrottleLimit) has been reduced to double the number of cores - $ThrottleLimit"
+            break
+         }
+         ($ThrottleLimit -lt $numberOfCores){
+            Write-Information "Number of threads (ThrotttleLimit) can be used on this system to speed up processing"
+         }
+        Default {}
     }
 
     if (Test-Path $LogFilePath) {
