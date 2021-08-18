@@ -218,17 +218,27 @@ BEGIN {
             $ThrottleLimit = $numberOfCores * 2
             Write-Warning "Number of threads (ThrottleLimit) has been reduced to double the number of cores - $ThrottleLimit"
             break
-         }
-         ($ThrottleLimit -lt $numberOfCores){
+        }
+        ($ThrottleLimit -lt $numberOfCores) {
             Write-Information "Number of threads (ThrotttleLimit) can be used on this system to speed up processing"
-         }
+        }
         Default {}
+    }
+
+    if ($JSONFormat) {
+        $logExtension = 'json'
+        if ($logfilePath.EndsWith('.csv')) {
+            $LogFilePath.Replace('.csv','.json')
+        }
+    }
+    else {
+        $logExtension = 'csv'
     }
 
     if (Test-Path $LogFilePath) {
         $pth = Get-Item $LogFilePath
         if ($pth.Attributes = 'Directory') {
-            $LogFilePath = Join-Path $LogFilePath "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv"
+            $LogFilePath = Join-Path $LogFilePath "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).$logExtension"
         }
     }
 
