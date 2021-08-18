@@ -97,9 +97,8 @@ function Write-VhdOutput {
             $logMessage | Add-Content -Path $Path -ErrorAction Stop
         }
         else {
-            $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
+            $csvOutput | Export-Csv -Path $Path -NoClobber -Append -NoTypeInformation -Force -ErrorAction Stop
         }
-
 
     } #Process
     END { } #End
