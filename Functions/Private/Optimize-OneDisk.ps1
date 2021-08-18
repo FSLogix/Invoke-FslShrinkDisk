@@ -147,19 +147,19 @@ function Optimize-OneDisk {
         $defrag = $false
         while ($defrag -eq $false -and $timespan -gt (Get-Date)) {
             try {
-                $vol = Get-Volume -Partition $partInfo -ErrorAction Stop 
+                $vol = Get-Volume -Partition $partInfo -ErrorAction Stop
                 $vol | Optimize-Volume -ErrorAction Stop
                 $defrag = $true
             }
             catch {
                 try {
                     $volObjId = Get-Volume -ErrorAction Stop | Where-Object {
-                        $_.UniqueId -like "*$($partInfo.Guid)*" -or 
-                        $_.Path -Like "*$($partInfo.Guid)*" -or 
-                        $_.ObjectId -Like "*$($partInfo.Guid)*" } | Select-Object -Property 'ObjectId' 
+                        $_.UniqueId -like "*$($partInfo.Guid)*" -or
+                        $_.Path -Like "*$($partInfo.Guid)*" -or
+                        $_.ObjectId -Like "*$($partInfo.Guid)*" } | Select-Object -Property 'ObjectId'
 
                     Optimize-Volume -ObjectId $volObjId.ObjectId -ErrorAction Stop | Out-Null
-                            
+
                     $defrag = $true
                 }
                 catch {
@@ -227,10 +227,11 @@ function Optimize-OneDisk {
 
         #Change the disk size and grab the new size
 
-        $retries = 0
         $success = $false
         #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
-        while ($retries -lt 30 -and $success -ne $true) {
+
+        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
+        while ($success -ne $true -and $timespan -gt (Get-Date)) {
 
             $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
 
@@ -253,12 +254,12 @@ function Optimize-OneDisk {
 
             #diskpart doesn't return an object (1989 remember) so we have to parse the text output.
             $diskPartFlag = $false
-            
+
             #using the success lines for different languages defined in the begin block test for success
             foreach ($langString in $diskPartLang) {
                 if ($diskPartResult -contains $langString) {
                     $diskPartFlag = $true
-                }               
+                }
             }
 
             if ($diskPartFlag) {
@@ -268,7 +269,6 @@ function Optimize-OneDisk {
             }
             else {
                 Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
-                $retries++
                 #if DiskPart fails, try, try again.
             }
             Start-Sleep 1

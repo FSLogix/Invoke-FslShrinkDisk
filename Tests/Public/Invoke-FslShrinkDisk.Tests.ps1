@@ -7,13 +7,12 @@ BeforeAll {
     Set-Content 'function Invoke-FslShrinkDisk {' -Path $tstdrvPath
     Add-Content -Path $tstdrvPath $script
     Add-Content -Path $tstdrvPath '}'
-    . "$here\Functions\Private\Invoke-Parallel"
-    . "$here\Functions\Private\Mount-FslDisk"
-    . "$here\Functions\Private\Dismount-FslDisk"
-    . "$here\Functions\Private\Optimize-OneDisk"
-    . "$here\Functions\Private\Write-VhdOutput"
-    function Test-FslDependencies ($Service, $InputObject) {}
-    . $tstdrvPath
+    . "$here\Functions\Private\Invoke-Parallel.ps1"
+    . "$here\Functions\Private\Mount-FslDisk.ps1"
+    . "$here\Functions\Private\Dismount-FslDisk.ps1"
+    . "$here\Functions\Private\Optimize-OneDisk.ps1"
+    . "$here\Functions\Private\Write-VhdOutput.ps1"
+    . "$here\Functions\Private\Test-FslDependencies.ps1"
 }
 
 Describe 'Invoke-FslShrinkDisk' {

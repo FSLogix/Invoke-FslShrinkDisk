@@ -1,6 +1,8 @@
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "")]
+Param()
 
 BeforeAll {
-    
+
     $here = Split-Path -Parent $PSCommandPath
     $funcType = Split-Path $here -Leaf
     $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'
@@ -18,33 +20,22 @@ BeforeAll {
 
 }
 
-
-
 Describe "Describing Optimize-OneDisk" {
 
     BeforeAll {
 
-        Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"  
+        Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"
         $disk = Get-ChildItem "Testdrive:\notdisk.vhdx"
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function', Target = '*')]
         $notDisk = New-Item testdrive:\fakeextension.vhdx.txt | Get-ChildItem
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $DeleteOlderThanDays = 90
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $IgnoreLessThanGB = $null
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $LogFilePath = 'TestDrive:\log.csv'
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $guid = '129c832f-846f-4937-bb64-2d456d2c7d04'
         $SizeMax = 4668260352
         $SizeMin = 1
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $english = Get-Content "$here\Tests\LanguageResultsForDiskPart\English.txt"
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $french = Get-Content "$here\Tests\LanguageResultsForDiskPart\French.txt"
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $spanish = Get-Content "$here\Tests\LanguageResultsForDiskPart\Spanish.txt"
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $german = Get-Content "$here\Tests\LanguageResultsForDiskPart\German.txt"
 
         Mock -CommandName Mount-FslDisk -MockWith { [PSCustomObject]@{
@@ -70,7 +61,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Input" {
         BeforeAll {
-            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+
             $paramShrinkOneDisk = @{
                 Disk                = $notdisk
                 DeleteOlderThanDays = $DeleteOlderThanDays
@@ -122,7 +113,7 @@ Describe "Describing Optimize-OneDisk" {
 
             $disk.LastAccessTime = (Get-Date).AddDays(-2)
 
-            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+
             $paramShrinkOneDisk = @{
                 Disk                = $disk
                 DeleteOlderThanDays = 1
@@ -132,8 +123,8 @@ Describe "Describing Optimize-OneDisk" {
             }
         }
 
-        It "Gives right output when no deletion" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskDeletionFailed'
+        It "Gives right output when no deletion" {
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Disk Deletion Failed'
         }
     }
 
@@ -169,7 +160,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Works in French" {
 
-        It "Works in French" -tag 'new' {
+        It "Works in French" {
             Mock -CommandName invoke-diskpart -MockWith { $french }
             Mock -CommandName Get-Partition -MockWith { [PSCustomObject]@{
                     Type            = 'Basic'
@@ -205,7 +196,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Locked" {
 
-        It "Gives right output when disk is Locked" -Skip {
+        It "Gives right output when disk is Locked" {
             $errtxt = 'Disk in use'
             Mock -CommandName Mount-FslDisk -MockWith { Write-Error $errtxt }
 
@@ -222,7 +213,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "No Partition" {
 
-        It "Gives right output when No Partition" -Skip {
+        It "Gives right output when No Partition" {
             Mock -CommandName Get-PartitionSupportedSize -MockWith { Write-Error 'Nope' }
             Mock -CommandName Get-Partition -MockWith { $null }
             Mock -CommandName Get-Volume -MockWith { $null }
@@ -234,14 +225,15 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
+                GeneralTimeout      = 0
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'NoPartitionInfo'
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -BeLike "No Partition Information*"
         }
     }
 
     Context "Shrink Partition Fail" {
 
-        It "Gives right output when Shrink Partition Fail" -Skip {
+        It "Gives right output when Shrink Partition Fail" -Tag 'Current' {
 
             Mock -CommandName Resize-Partition -MockWith { Write-Error 'Nope' } -ParameterFilter { $Size -ne $SizeMax }
 
@@ -251,6 +243,7 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
+                GeneralTimeout      = 0
             }
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionShrinkFailed'
         }
@@ -265,6 +258,7 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.5
+                GeneralTimeout      = 0
             }
 
             $out = Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState
@@ -284,6 +278,7 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
+                GeneralTimeout      = 0
             }
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskShrinkFailed'
         }
@@ -301,6 +296,7 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
+                GeneralTimeout      = 0
             }
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionSizeRestoreFailed'
         }
@@ -311,11 +307,12 @@ Describe "Describing Optimize-OneDisk" {
             Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -eq $SizeMax }
             Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
 
-            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+
             $paramShrinkOneDisk = @{
                 DeleteOlderThanDays = $DeleteOlderThanDays
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 RatioFreeSpace      = 0.2
+                GeneralTimeout      = 0
             }
 
         }
