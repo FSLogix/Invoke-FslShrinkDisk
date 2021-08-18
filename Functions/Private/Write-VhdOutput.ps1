@@ -91,25 +91,15 @@ function Write-VhdOutput {
                 Write-Output $csvOutput
             }
         }
-        $success = $False
-        $retries = 0
-        while ($retries -lt 10 -and $success -ne $true) {
-            try {
-                if ($JSONFormat) {
-                    $logMessage = $jsonOutput | ConvertTo-Json -Compress
-                    $logMessage | Set-Content -Path $Path
-                }
-                else {
-                    $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
-                }
 
-                $success = $true
-            }
-            catch {
-                $retries++
-                Start-Sleep 1
-            }
+        if ($JSONFormat) {
+            $logMessage = $jsonOutput | ConvertTo-Json -Compress
+            $logMessage | Add-Content -Path $Path
         }
+        else {
+            $csvOutput | Export-Csv -Path $Path -NoClobber -Append -ErrorAction Stop -NoTypeInformation -Force
+        }
+
 
     } #Process
     END { } #End

@@ -45,8 +45,23 @@ Describe "Describing Write-VhdOutput" {
     }
 
     It 'Creates a json File' {
-        Write-VhdOutput @param -JSONFormat | Out-Null
-        (Get-Content $path | Measure-Object).Count | Should -Be 1
+        $path1 = 'TestDrive:\ICareNot1.csv'
+        Write-VhdOutput @param -JSONFormat -Path $path1 | Out-Null
+        (Get-Content $path1 | Measure-Object).Count | Should -Be 1
+    }
+
+    It 'Appends to a json File' {
+        $path2 = 'TestDrive:\ICareNot2.csv'
+        Write-VhdOutput @param -JSONFormat -Path $path2 | Out-Null
+        Write-VhdOutput @param -JSONFormat -Path $path2 | Out-Null
+        (Get-Content $path2 | Measure-Object).Count | Should -Be 2
+    }
+
+    It 'Appends to a csv File' {
+        $path3 = 'TestDrive:\ICareNot3.csv'
+        Write-VhdOutput @param -Path $path3 | Out-Null
+        Write-VhdOutput @param -Path $path3 | Out-Null
+        (Get-Content $path3 | Measure-Object).Count | Should -Be 3
     }
 
     It 'Take less than a second to run' {

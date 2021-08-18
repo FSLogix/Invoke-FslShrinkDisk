@@ -222,24 +222,22 @@ BEGIN {
         ($ThrottleLimit -lt $numberOfCores) {
             Write-Information "Number of threads (ThrotttleLimit) can be used on this system to speed up processing"
         }
+        ($ThrottleLimit -le 4 ) {
+            Write-Warning "Number of threads($ThrottleLimit) in use on this machine is low, increase cores/threads to increase processing speeed"
+        }
         Default {}
     }
 
-    if ($JSONFormat) {
-        $logExtension = 'json'
-        if ($logfilePath.EndsWith('.csv')) {
-            $LogFilePath.Replace('.csv','.json')
-        }
-    }
-    else {
-        $logExtension = 'csv'
-    }
 
     if (Test-Path $LogFilePath) {
         $pth = Get-Item $LogFilePath
         if ($pth.Attributes = 'Directory') {
-            $LogFilePath = Join-Path $LogFilePath "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).$logExtension"
+            $LogFilePath = Join-Path $LogFilePath "FslShrinkDisk $(Get-Date -Format yyyy-MM-dd` HH-mm-ss).csv"
         }
+    }
+
+    if ($JSONFormat -and ($logfilePath.EndsWith('.csv'))) {
+        $LogFilePath.Replace('.csv', '.json')
     }
 
 } # Begin
@@ -259,6 +257,7 @@ PROCESS {
         $diskList = Get-ChildItem -File -Filter *.vhd? -Path $Path
     }
 
+    #Todo check if vhd is possible with Cloud Cache
     $diskList = $diskList | Where-Object { $_.Name -ne "Merge.vhdx" -and $_.Name -ne "RW.vhdx" }
 
     #If we can't find and files with the extension vhd or vhdx quit
