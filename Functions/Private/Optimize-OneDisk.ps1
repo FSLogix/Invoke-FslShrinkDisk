@@ -83,7 +83,7 @@ function Optimize-OneDisk {
         }
 
         #Check it is a disk
-        if ($Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
+        if ( $Disk.Extension -ne '.vhd' -and $Disk.Extension -ne '.vhdx' ) {
             Write-VhdOutput -DiskState 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx' -EndTime (Get-Date)
             return
         }
@@ -91,11 +91,11 @@ function Optimize-OneDisk {
         #If it's older than x days delete disk
         If ( $DeleteOlderThanDays ) {
             #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent of access and write
-            $mostRecent = $Disk.LastAccessTime, $Disk.LastWriteTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+            $mostRecent = $Disk.LastWriteTime
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
                     Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Deleted" -FinalSize 0 -EndTime (Get-Date)
+                    Write-VhdOutput -DiskState "Disk Deleted" -FinalSize 0 -EndTime (Get-Date)
                 }
                 catch {
                     Write-VhdOutput -DiskState 'Disk Deletion Failed' -EndTime (Get-Date)
@@ -104,9 +104,9 @@ function Optimize-OneDisk {
             }
         }
 
-        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small onesBytes
+        #As disks take time to process, if you have a lot of disks, it may not be worth shrinking the small ones
         if ( $IgnoreLessThanGB -and $originalSize -lt $IgnoreLessThanBytes ) {
-            Write-VhdOutput -DiskState 'Ignored' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState "Disk Ignored as it is smaller than $IgnoreLessThanGB GB" -EndTime (Get-Date)
             return
         }
 
@@ -125,9 +125,9 @@ function Optimize-OneDisk {
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
             try {
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object { $_.Type -eq 'Basic' -or $_.Type -eq 'IFS' } -ErrorAction Stop
+                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop
                 if ($partinfo.Type -eq 'IFS') {
-                    Write-Warning 'Disk is not created by FSLogix, this tool is designed for FSLogix disks'
+                    Write-Warning 'Disk was not created by FSLogix, this tool is only tested on FSLogix disks'
                 }
             }
             catch {
@@ -202,23 +202,21 @@ function Optimize-OneDisk {
 
         if ($partSize -eq $false) {
             #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
-            Write-VhdOutput -DiskState 'No Supported Size Info for partition - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
+            Write-VhdOutput -DiskState 'No Supported Size Info for partition - Disk may be corrupt' -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
-
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
 
         if ( $partitionsize.SizeMin -gt $disk.Length ) {
-            Write-VhdOutput -DiskState "SkippedAlreadyMinimum" -EndTime (Get-Date)
+            Write-VhdOutput -DiskState "Skipped - Disk Already at Minimum Size" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
 
-
         if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
-            Write-VhdOutput -DiskState "LessThan$(100*$RatioFreeSpace)%FreeInsideDisk" -EndTime (Get-Date)
+            Write-VhdOutput -DiskState "Less Than $(100*$RatioFreeSpace)% Free Inside Disk" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
         }
@@ -230,8 +228,9 @@ function Optimize-OneDisk {
         $success = $false
         #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
 
-        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
-        while ($success -ne $true -and $timespan -gt (Get-Date)) {
+        $maxRetries = [math]::ceiling($GeneralTimeout / 4)
+        $retries = 0
+        while ($success -ne $true -and $retries -le $maxRetries) {
 
             $tempFileName = "$env:TEMP\FslDiskPart$($Disk.Name).txt"
 
@@ -268,24 +267,25 @@ function Optimize-OneDisk {
                 Remove-Item $tempFileName
             }
             else {
-                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name)-$retries.log" -Value $diskPartResult
+                Set-Content -Path "$env:TEMP\FslDiskPartError$($Disk.Name).log" -Value $diskPartResult
                 #if DiskPart fails, try, try again.
             }
-            Start-Sleep 1
+            $retries++
+            Start-Sleep 0.1
         }
 
         If ($success -ne $true) {
-            Write-VhdOutput -DiskState "DiskShrinkFailed" -EndTime (Get-Date)
+            Write-VhdOutput -DiskState "Disk Shrink Failed" -EndTime (Get-Date)
             Remove-Item $tempFileName
             return
         }
 
-        $paramWriteVhdOutput = @{
-            DiskState = "Success"
-            FinalSize = $finalSize
-            EndTime   = Get-Date
+        If ($originalSize -eq $finalSize){
+            Write-VhdOutput -DiskState "No Shrink Achieved" -EndTime (Get-Date)
+            return
         }
-        Write-VhdOutput @paramWriteVhdOutput
+
+        Write-VhdOutput -DiskState "Success" -FinalSize $finalSize -EndTime (Get-Date)
     } #Process
     END { } #End
 }  #function Optimize-OneDisk

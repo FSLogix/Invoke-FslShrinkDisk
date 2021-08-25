@@ -23,11 +23,12 @@ BeforeAll {
 Describe "Describing Optimize-OneDisk" {
 
     BeforeAll {
-
         Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\notdisk.vhdx"
+        Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\SizeDelete.vhdx"
+        Copy-Item "$here\Tests\LanguageResultsForDiskPart\English.txt" "Testdrive:\DeleteFail.vhdx"
         $disk = Get-ChildItem "Testdrive:\notdisk.vhdx"
+        $deleteFail = Get-ChildItem "Testdrive:\DeleteFail.vhdx"
         $notDisk = New-Item testdrive:\fakeextension.vhdx.txt | Get-ChildItem
-        $DeleteOlderThanDays = 90
         $IgnoreLessThanGB = $null
         $LogFilePath = 'TestDrive:\log.csv'
         $guid = '129c832f-846f-4937-bb64-2d456d2c7d04'
@@ -57,6 +58,17 @@ Describe "Describing Optimize-OneDisk" {
         Mock -CommandName DisMount-FslDisk -MockWith { $null }
         Mock -CommandName Start-Sleep -MockWith { $null }
         Mock -CommandName invoke-diskpart -MockWith { $english }
+        Mock -CommandName Get-Partition -MockWith { [PSCustomObject]@{
+                Type = 'Basic'
+                Guid = $guid
+            } }
+        Mock -CommandName Get-Volume -MockWith { [PSCustomObject]@{
+                UniqueId = $guid
+                ObjectId = $guid
+            }
+        }
+        Mock -CommandName Optimize-Volume -MockWith { $null }
+
     }
 
     Context "Input" {
@@ -103,61 +115,6 @@ Describe "Describing Optimize-OneDisk" {
 
     }
 
-    Context "Failed delete" {
-
-        BeforeAll {
-            Mock -CommandName Remove-Item -MockWith { Write-Error 'Nope' }
-            Mock -CommandName Get-Partition -MockWith { $null }
-            Mock -CommandName Get-Volume -MockWith { $null }
-            Mock -CommandName Optimize-Volume -MockWith { $null }
-
-            $disk.LastAccessTime = (Get-Date).AddDays(-2)
-
-
-            $paramShrinkOneDisk = @{
-                Disk                = $disk
-                DeleteOlderThanDays = 1
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-            }
-        }
-
-        It "Gives right output when no deletion" {
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Disk Deletion Failed'
-        }
-    }
-
-    Context "Not Disk" {
-
-        It "Gives right output when not disk" {
-            $paramShrinkOneDisk = @{
-                Disk                = $notDisk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-            }
-
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx'
-        }
-    }
-
-    Context "Too Small" {
-
-        It "Gives right output disk is too small" {
-            $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = 5
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-            }
-
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Ignored'
-        }
-    }
-
     Context "Works in French" {
 
         It "Works in French" {
@@ -190,143 +147,259 @@ Describe "Describing Optimize-OneDisk" {
                 Passthru            = $true
                 GeneralTimeout      = 60
             }
-            Optimize-OneDisk @paramShrinkOneDisk | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
+            Optimize-OneDisk @paramShrinkOneDisk | Select-Object -ExpandProperty DiskState | Should -Be 'No Shrink Achieved'
         }
     }
 
-    Context "Locked" {
+    Context "Not Disk" {
 
-        It "Gives right output when disk is Locked" {
-            $errtxt = 'Disk in use'
-            Mock -CommandName Mount-FslDisk -MockWith { Write-Error $errtxt }
-
+        It "Gives right output when not disk" {
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
+                Disk                = $notDisk
                 DeleteOlderThanDays = $DeleteOlderThanDays
                 IgnoreLessThanGB    = $IgnoreLessThanGB
                 LogFilePath         = $LogFilePath
                 RatioFreeSpace      = 0.2
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be $errtxt
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx'
+        }
+    }
+
+    Context "Disk Deleted" {
+
+        It "Deletes a small disk" {
+
+            $paramShrinkOneDisk = @{
+                Disk                = $deleteFail
+                DeleteOlderThanDays = 1
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+                GeneralTimeout      = 1
+            }
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'Disk Deleted'
+        }
+    }
+
+    Context "Disk Deletion Failed" {
+
+        It "Gives right output when no deletion" {
+
+            $disk.LastAccessTime = (Get-Date).AddDays(-2)
+
+            Mock -CommandName Remove-Item -MockWith { Write-Error 'Nope' }
+
+            $paramShrinkOneDisk = @{
+                Disk                = $disk
+                DeleteOlderThanDays = 1
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+            }
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Disk Deletion Failed'
+        }
+    }
+
+    Context "Too Small" {
+
+        It "Gives right output disk is too small" {
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = 5
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+            }
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Disk Ignored as it is smaller than*"
+        }
+    }
+
+    Context "Initial Disk Mount" {
+
+        It "Gives right output when disk fails to mount" {
+            $errtxt = 'Disk in use'
+            Mock -CommandName Mount-FslDisk -MockWith { Write-Error $errtxt }
+
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+            }
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be $errtxt
         }
     }
 
     Context "No Partition" {
 
         It "Gives right output when No Partition" {
-            Mock -CommandName Get-PartitionSupportedSize -MockWith { Write-Error 'Nope' }
-            Mock -CommandName Get-Partition -MockWith { $null }
-            Mock -CommandName Get-Volume -MockWith { $null }
-            Mock -CommandName Optimize-Volume -MockWith { $null }
+
+            Mock -CommandName Get-Partition -MockWith { Write-Error 'Nope' }
 
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -BeLike "No Partition Information*"
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "No Partition Information*"
         }
     }
 
-    Context "Shrink Partition Fail" {
+    Context "Defrag Disk" {
 
-        It "Gives right output when Shrink Partition Fail" -Tag 'Current' {
+        It "Gives right output when defragmentation of the disk failed" {
 
-            Mock -CommandName Resize-Partition -MockWith { Write-Error 'Nope' } -ParameterFilter { $Size -ne $SizeMax }
+            Mock -CommandName Optimize-Volume -MockWith { Write-Error 'NoDefrag' }
 
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionShrinkFailed'
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'Defragmentation of the disk failed'
         }
     }
 
-    Context "No Partition Space" {
+    Context "Partition Size" {
 
-        It "Gives right output when No Partition Space" -Skip {
+        It "Gives right output when no Supported Size Info for partition" {
+
+            Mock -CommandName Get-PartitionSupportedSize -MockWith { Write-Error 'NoPartSize' }
+
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.5
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
             }
-
-            $out = Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState
-            $out | Should -Be LessThan$(100*$paramShrinkOneDisk.RatioFreeSpace)%FreeInsideDisk
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'No Supported Size Info for partition - Disk may be corrupt'
         }
     }
 
-    Context "Shrink Disk Fail" {
+    Context "Skipped already min" {
 
-        It "Gives right output when Shrink Disk Fail" -Skip {
+        It "Skips Disk if size is current minimum" {
 
+            Mock -CommandName Get-PartitionSupportedSize -MockWith { [PSCustomObject]@{
+                    SizeMin = 1048576
+                    SizeMax = $SizeMax
+                }
+            }
+
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
+            }
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'Skipped - Disk Already at Minimum Size'
+        }
+    }
+
+    Context "Less than ratio free" {
+
+        It "Skips Disk if Ratio of free space isn't enough to justify shrink" {
+
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 1
+                GeneralTimeout   = 1
+            }
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Less Than *% Free Inside Disk"
+        }
+    }
+
+    Context "DiskPart Failed" {
+
+        It "Gives right output when Diskpart doesn't shrink disk" {
             Mock -CommandName invoke-diskpart -MockWith { $null }
-
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.1
+                GeneralTimeout   = 1
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'DiskShrinkFailed'
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Disk Shrink Failed"
         }
     }
 
-    Context "Restore Partition size Fail" {
+    Context "Did not shrink" {
 
-        It "Gives right output when estore Partition size Fail" -Skip {
-            Mock -CommandName Resize-Partition -MockWith { Write-Error 'nope' } -ParameterFilter { $Size -eq $SizeMax }
-            Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
+        It "Doesn't say success if no shrink happened" {
 
             $paramShrinkOneDisk = @{
-                Disk                = $Disk
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                LogFilePath         = $LogFilePath
-                RatioFreeSpace      = 0.2
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
             }
-            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'PartitionSizeRestoreFailed'
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be "No Shrink Achieved"
         }
     }
 
     Context "Output" {
         BeforeAll {
-            Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -eq $SizeMax }
-            Mock -CommandName invoke-diskpart -MockWith { , 'DiskPart successfully compacted the virtual disk file.' }
 
+            Mock -CommandName Get-ChildItem -MockWith { [PSCustomObject]@{
+                    Length = 1
+                }
+            }
 
             $paramShrinkOneDisk = @{
-                DeleteOlderThanDays = $DeleteOlderThanDays
-                IgnoreLessThanGB    = $IgnoreLessThanGB
-                RatioFreeSpace      = 0.2
-                GeneralTimeout      = 0
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
             }
 
         }
 
-        It "Gives right output when Shink Successful" -Skip {
-            Optimize-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
+        It "Gives right output when Shink Successful" {
+            Optimize-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'Success'
         }
 
-        It "Saves correct information in a csv" -Skip {
+        It "Saves correct information in a csv" {
             Optimize-OneDisk @paramShrinkOneDisk -Disk $Disk -ErrorAction Stop -LogFilePath 'TestDrive:\OutputTest.csv'
             Import-Csv 'TestDrive:\OutputTest.csv' | Select-Object -ExpandProperty DiskState | Should -Be 'Success'
         }
 
-        It "Appends information in a csv" -Skip {
+        It "Appends information in a csv" {
             Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $Disk
             Optimize-OneDisk @paramShrinkOneDisk -ErrorAction Stop -LogFilePath 'TestDrive:\AppendTest.csv' -Disk $NotDisk
             Import-Csv 'TestDrive:\AppendTest.csv' | Measure-Object | Select-Object -ExpandProperty Count | Should -Be 2
