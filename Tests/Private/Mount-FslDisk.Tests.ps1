@@ -109,6 +109,22 @@ Describe "Describing Mount-FslDisk" {
             Mock -CommandName Join-Path -MockWith { 'TestDrive:\mountHere' }
         }
 
+        It "Writes error when mount fails" {
+            Mock -CommandName Mount-DiskImage -MockWith { Write-Error 'NoMount' }
+            { Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop } | Should -Throw
+        }
+
+        It "Writes error when Get-DiskImage fails" {
+            Mock -CommandName Get-DiskImage -MockWith { Write-Error 'NoGet' }
+            { Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop } | Should -Throw
+        }
+
+        It "Writes error when Dismount-DiskImage fails" {
+            Mock -CommandName Dismount-DiskImage -MockWith { Write-Error 'NoDisMount' }
+            Mock -CommandName Get-DiskImage -MockWith { Write-Error 'NoGet' }
+            { Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop } | Should -Throw
+        }
+
 
         It "It produces a mount path" {
             Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Select-Object -ExpandProperty ImagePath | Should -Be $path

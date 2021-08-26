@@ -35,10 +35,9 @@ function Mount-FslDisk {
         }
         catch {
             $e = $error[0]
-            Write-Error "Failed to mount disk - `"$e`""
+            Write-Error "Failed to mount disk - $($e.ToString())"
             return
         }
-
 
         $diskNumber = $false
         $timespan = (Get-Date).AddSeconds($TimeOut)
@@ -57,7 +56,9 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            try {
+                $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue
+            }
             catch {
                 Write-Error 'Could not dismount Disk Due to no Disknumber'
             }
@@ -72,9 +73,9 @@ function Mount-FslDisk {
             try {
                 $allPartition = Get-Partition -DiskNumber $mountedDisk.Number -ErrorAction Stop
 
-                if ($allPartition.Type -contains 'Basic') {
+                if ($allPartition.Type -contains 'Basic' -or $allPartition.Type -eq 'IFS') {
                     $partitionType = $true
-                    $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                    $partition = $allPartition | Where-Object { $_.Type -eq 'Basic' -or $_.Type -eq 'IFS' }
                 }
             }
             catch {
@@ -83,7 +84,6 @@ function Mount-FslDisk {
                     $partitionType = $true
                 }
                 else{
-
                     $partitionType = $false
                 }
 
@@ -110,13 +110,14 @@ function Mount-FslDisk {
             New-Item -Path $mountPath -ItemType Directory -ErrorAction Stop | Out-Null
         }
         catch {
-            $e = $error[0]
+            $err = $error[0]
             # Cleanup
             try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
             catch {
-                Write-Error "Could not dismount disk when no folder could be created - `"$e`""
+                $err = $error[0]
+                Write-Error "Could not dismount disk when no folder could be created - $($err.ToString())"
             }
-            Write-Error "Failed to create mounting directory - `"$e`""
+            Write-Error "Failed to create mounting directory - $($err.ToString())"
             return
         }
 
@@ -131,14 +132,16 @@ function Mount-FslDisk {
             Add-PartitionAccessPath @addPartitionAccessPathParams
         }
         catch {
-            $e = $error[0]
+            $err = $error[0]
             # Cleanup
             Remove-Item -Path $mountPath -Force -Recurse -ErrorAction SilentlyContinue
             try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
             catch {
-                Write-Error "Could not dismount disk when no junction point could be created - `"$e`""
+                $err = $error[0]
+                Write-Error "Could not dismount disk when no junction point could be created - $($err.ToString())"
             }
-            Write-Error "Failed to create junction point to - `"$e`""
+
+            Write-Error "Failed to create junction point to - $($err.ToString())"
             return
         }
 

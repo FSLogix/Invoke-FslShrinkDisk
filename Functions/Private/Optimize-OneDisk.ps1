@@ -42,7 +42,12 @@ function Optimize-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [switch]$Passthru
+        [switch]$Passthru,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Switch]$JSONFormat
 
     )
 
@@ -126,7 +131,7 @@ function Optimize-OneDisk {
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
             try {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop
-                if ($partinfo.Type -eq 'IFS') {
+                if ($partinfo.Type -ne 'Basic') {
                     Write-Warning 'Disk was not created by FSLogix, this tool is only tested on FSLogix disks'
                 }
             }

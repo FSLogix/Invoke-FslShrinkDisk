@@ -43,7 +43,6 @@ function Write-VhdOutput {
         [datetime]$EndTime,
 
         [Parameter(
-            Mandatory = $true
         )]
         [Switch]$Passthru,
 
