@@ -18,6 +18,11 @@ function Mount-FslDisk {
         [Int]$TimeOut = 3,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+        )]
+        [Switch]$ReadOnly,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$PassThru

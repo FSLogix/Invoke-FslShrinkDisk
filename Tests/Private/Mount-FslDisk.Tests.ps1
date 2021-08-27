@@ -8,7 +8,7 @@ BeforeAll {
 
 Describe "Describing Mount-FslDisk" {
 
-    BeforeAll{
+    BeforeAll {
         $Path = 'TestDrive:\ThisDoesNotExist.vhdx'
 
         Mock -CommandName Mount-DiskImage -MockWith {
@@ -137,5 +137,9 @@ Describe "Describing Mount-FslDisk" {
         It "It produces a Path" {
             Mount-FslDisk -Path $Path -Passthru -ErrorAction Stop | Select-Object -ExpandProperty Path | Should -Be 'TestDrive:\mountHere'
         }
+    }
+
+    Context "Output" {
+
     }
 }
