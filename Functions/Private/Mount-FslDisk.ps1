@@ -18,7 +18,7 @@ function Mount-FslDisk {
         [Int]$TimeOut = 3,
 
         [Parameter(
-            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipelineByPropertyName = $true
         )]
         [Switch]$ReadOnly,
 
@@ -36,7 +36,19 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
+            $paramMountDiskImage = [PSCustomObject]@{
+                ImagePath = $Path
+                NoDriveeLetter = $true
+                PassThru = $true
+                ErrorAction = 'Stop'
+            }
+            if ($ReadOnly) {
+                $mountedDisk = Mount-DiskImage -Access ReadOnly @paramMountDiskImage
+            }
+            else {
+                $mountedDisk = Mount-DiskImage @paramMountDiskImage
+            }
+
         }
         catch {
             $e = $error[0]

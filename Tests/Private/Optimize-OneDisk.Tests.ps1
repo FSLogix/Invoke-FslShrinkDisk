@@ -183,6 +183,24 @@ Describe "Describing Optimize-OneDisk" {
             Select-Object -ExpandProperty DiskState |
             Should -Be 'Disk Deleted'
         }
+
+        It "Analyzes a small disk deletion" {
+
+            $paramShrinkOneDisk = @{
+                Disk                = $deleteFail
+                DeleteOlderThanDays = 1
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+                GeneralTimeout      = 1
+                Analyze             = $true
+            }
+
+            $result = Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop
+            $result.DiskState | Should -Be 'Analyze'
+            $result.FinalSizeGB | Should -Be 0
+
+        }
     }
 
     Context "Disk Deletion Failed" {
@@ -213,6 +231,20 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB = 5
                 LogFilePath      = $LogFilePath
                 RatioFreeSpace   = 0.2
+            }
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Disk Ignored as it is smaller than*"
+        }
+
+        It "Gives right output disk is too small" {
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = 5
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                Analyze          = $true
             }
 
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
@@ -279,7 +311,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Partition Size" {
 
-        It "Gives right output when no Supported Size Info for partition" {
+        It "Gives right output when no Supported Size Info for partition" -Tag 'Current' {
 
             Mock -CommandName Get-PartitionSupportedSize -MockWith { Write-Error 'NoPartSize' }
 
@@ -288,7 +320,7 @@ Describe "Describing Optimize-OneDisk" {
                 IgnoreLessThanGB = $IgnoreLessThanGB
                 LogFilePath      = $LogFilePath
                 RatioFreeSpace   = 0.2
-                GeneralTimeout   = 1
+                GeneralTimeout   = 2
             }
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
             Select-Object -ExpandProperty DiskState |
@@ -392,6 +424,12 @@ Describe "Describing Optimize-OneDisk" {
             Optimize-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop |
             Select-Object -ExpandProperty DiskState |
             Should -Be 'Success'
+        }
+
+        It "Gives right output when Analyze Successful" {
+            Optimize-OneDisk @paramShrinkOneDisk -LogFilePath $LogFilePath -Passthru -Disk $Disk -ErrorAction Stop -Analyze |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be 'Analyze'
         }
 
         It "Saves correct information in a csv" {

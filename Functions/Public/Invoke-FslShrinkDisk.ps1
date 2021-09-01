@@ -170,6 +170,11 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
+    [switch]$Analyze,
+
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
     [Switch]$JSONFormat
 )
 
@@ -286,6 +291,7 @@ PROCESS {
             LogFilePath         = $using:LogFilePath
             PassThru            = $using:PassThru
             RatioFreeSpace      = $using:RatioFreeSpace
+            Analyze             = $using:Analyze
         }
         Optimize-OneDisk @paramOptimizeOneDisk
 
@@ -302,6 +308,7 @@ PROCESS {
             LogFilePath         = $LogFilePath
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
+            Analyze             = $Analyze
         }
         Optimize-OneDisk @paramOptimizeOneDisk
 

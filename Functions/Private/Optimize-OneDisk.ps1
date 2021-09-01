@@ -42,6 +42,11 @@ function Optimize-OneDisk {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
+        [switch]$Analyze,
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
         [switch]$Passthru,
 
         [Parameter(
@@ -61,13 +66,52 @@ function Optimize-OneDisk {
         'DiskPart compactó correctamente el archivo de disco virtual.',
         'Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich komprimiert.'
 
+        function Get-FslPartSize ($GeneralTimeout) {
+            $partSize = $false
+            $timespan = (Get-Date).AddSeconds($GeneralTimeout)
+            while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
+                try {
+                    $partitionSize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
+                    $partSize = $true
+                }
+                catch {
+                    $e = $error[0]
+                    if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*") {
+                        Get-Volume -Partition $partInfo -ErrorAction SilentlyContinue | Repair-Volume | Out-Null
+                    }
+
+                    try {
+                        $partitionSize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
+                        $partSize = $true
+                    }
+                    catch {
+                        $partSize = $false
+                        Start-Sleep 0.1
+                    }
+                }
+            }
+
+            if ($partSize -eq $false) {
+                #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
+                Write-VhdOutput -DiskState 'No Supported Size Info for partition - Disk may be corrupt' -EndTime (Get-Date)
+                $mount | DisMount-FslDisk
+                Write-Output
+                return
+            }
+            #TODO proper output for this function
+
+            Write-Output $partitionSize
+        }
+
     } # Begin
     PROCESS {
-        #In case there are disks left mounted let's try to clean up.
-        Dismount-DiskImage -ImagePath $Disk.FullName -ErrorAction SilentlyContinue
 
         #Get start time for logfile
         $startTime = Get-Date
+
+        #In case there are disks left mounted let's try to clean up.
+        Dismount-DiskImage -ImagePath $Disk.FullName -ErrorAction SilentlyContinue
+
         if ( $IgnoreLessThanGB ) {
             $IgnoreLessThanBytes = $IgnoreLessThanGB * 1024 * 1024 * 1024
         }
@@ -99,8 +143,13 @@ function Optimize-OneDisk {
             $mostRecent = $Disk.LastWriteTime
             if ($mostRecent -lt (Get-Date).AddDays(-$DeleteOlderThanDays) ) {
                 try {
-                    Remove-Item $Disk.FullName -ErrorAction Stop -Force
-                    Write-VhdOutput -DiskState "Disk Deleted" -FinalSize 0 -EndTime (Get-Date)
+                    if ($Analyze) {
+                        Write-VhdOutput -DiskState "Analyze" -FinalSize 0 -EndTime (Get-Date)
+                    }
+                    else {
+                        Remove-Item $Disk.FullName -ErrorAction Stop -Force
+                        Write-VhdOutput -DiskState "Disk Deleted" -FinalSize 0 -EndTime (Get-Date)
+                    }
                 }
                 catch {
                     Write-VhdOutput -DiskState 'Disk Deletion Failed' -EndTime (Get-Date)
@@ -117,7 +166,12 @@ function Optimize-OneDisk {
 
         #Initial disk Mount
         try {
-            $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut $MountTimeout -PassThru -ErrorAction Stop
+            if ($Analyze) {
+                $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut $MountTimeout -PassThru -ReadOnly -ErrorAction Stop
+            }
+            else {
+                $mount = Mount-FslDisk -Path $Disk.FullName -TimeOut $MountTimeout -PassThru -ErrorAction Stop
+            }
         }
         catch {
             $err = $error[0]
@@ -144,6 +198,20 @@ function Optimize-OneDisk {
         if (($partInfo | Measure-Object).Count -eq 0) {
             $mount | DisMount-FslDisk
             Write-VhdOutput -DiskState 'No Partition Information - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
+            return
+        }
+
+        #Output Analyze disk results here and dismount read only disk mount
+        if ($Analyze) {
+            $partitionSize = Get-FslPartSize -GeneralTimeout $GeneralTimeout
+            if ($partitionSize.SizeMin -gt $disk.Length) {
+                $finalSizeAnalyze = $disk.Length
+            }
+            else{
+                $finalSizeAnalyze = $partitionSize.SizeMin
+            }
+            $mount | DisMount-FslDisk
+            Write-VhdOutput -DiskState "Analyze" -FinalSize $finalSizeAnalyze -EndTime (Get-Date)
             return
         }
 
@@ -180,41 +248,11 @@ function Optimize-OneDisk {
             return
         }
 
-        #Grab partition information so we know what size to shrink the partition to and what to re-enlarge it to.  This helps optimise-vhd work at it's best
-        $partSize = $false
-        $timespan = (Get-Date).AddSeconds($GeneralTimeout)
-        while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
-            try {
-                $partitionsize = $partInfo | Get-PartitionSupportedSize -ErrorAction Stop
-                $partSize = $true
-            }
-            catch {
-                $e = $error[0]
-                if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*") {
-                    Get-Volume -Partition $partInfo -ErrorAction SilentlyContinue | Repair-Volume | Out-Null
-                }
-
-                try {
-                    $partitionsize = Get-PartitionSupportedSize -DiskNumber $mount.DiskNumber -PartitionNumber $mount.PartitionNumber -ErrorAction Stop
-                    $partSize = $true
-                }
-                catch {
-                    $partSize = $false
-                    Start-Sleep 0.1
-                }
-            }
-        }
-
-        if ($partSize -eq $false) {
-            #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
-            Write-VhdOutput -DiskState 'No Supported Size Info for partition - Disk may be corrupt' -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
-            return
-        }
+        #Grab partition information
+        $partitionSize = Get-FslPartSize -GeneralTimeout $GeneralTimeout
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
-
-        if ( $partitionsize.SizeMin -gt $disk.Length ) {
+        if ( $partitionSize.SizeMin -gt $disk.Length ) {
             Write-VhdOutput -DiskState "Skipped - Disk Already at Minimum Size" -EndTime (Get-Date)
             $mount | DisMount-FslDisk
             return
@@ -226,13 +264,12 @@ function Optimize-OneDisk {
             return
         }
 
+        #Dismount disk so diskpart can shrink it
         $mount | DisMount-FslDisk
 
-        #Change the disk size and grab the new size
 
-        $success = $false
         #Diskpart is a little erratic and can fail occasionally, so stuck it in a loop.
-
+        $success = $false
         $maxRetries = [math]::ceiling($GeneralTimeout / 4)
         $retries = 0
         while ($success -ne $true -and $retries -le $maxRetries) {
@@ -285,7 +322,7 @@ function Optimize-OneDisk {
             return
         }
 
-        If ($originalSize -eq $finalSize){
+        If ($originalSize -eq $finalSize) {
             Write-VhdOutput -DiskState "No Shrink Achieved" -EndTime (Get-Date)
             return
         }
