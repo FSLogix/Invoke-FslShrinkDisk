@@ -119,6 +119,9 @@ function Optimize-OneDisk {
         #Grab size of disk being processed
         $originalSize = $Disk.Length
 
+        #Grab Last Write Time in Utc
+        $lastWriteTime = $Disk.LastWriteTimeUtc
+
         #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.  Calclations to be done in the output function, raw data goes in.
         $PSDefaultParameterValues = @{
             "Write-VhdOutput:Path"         = $LogFilePath

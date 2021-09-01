@@ -22,6 +22,12 @@ function Dismount-FslDisk {
         [Switch]$PassThru,
 
         [Parameter(
+            ValuefromPipelineByPropertyName = $true,
+            ValuefromPipeline = $true
+        )]
+        [datetime]$SetLastWriteTime,
+
+        [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
         [Int]$Timeout = 120
@@ -89,6 +95,16 @@ function Dismount-FslDisk {
             }
             Write-Output $output
         }
+
+        if ($mountRemoved -and $SetLastWriteTime) {
+            try{
+                (Get-Item $ImagePath -ErrorAction Stop).LastWriteTimeUtc = $SetLastWriteTime
+            }
+            catch{
+                Write-Warning 'Failed to set Last Write time'
+            }
+        }
+
         if ($directoryRemoved -and $mountRemoved) {
             Write-Verbose "Dismounted $ImagePath"
         }
