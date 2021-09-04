@@ -122,7 +122,7 @@ function Optimize-OneDisk {
         #Grab Last Write Time in Utc
         $lastWriteTime = $Disk.LastWriteTimeUtc
 
-        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.  Calclations to be done in the output function, raw data goes in.
+        #Set default parameter values for the Write-VhdOutput command to prevent repeating code below, these can be overridden as I need to.  Calculations to be done in the output function, raw data goes in.
         $PSDefaultParameterValues = @{
             "Write-VhdOutput:Path"         = $LogFilePath
             "Write-VhdOutput:StartTime"    = $startTime
@@ -199,7 +199,7 @@ function Optimize-OneDisk {
         }
 
         if (($partInfo | Measure-Object).Count -eq 0) {
-            $mount | DisMount-FslDisk
+            $mount | DisMount-FslDisk -SetLastWriteTime $lastWriteTime
             Write-VhdOutput -DiskState 'No Partition Information - The Windows Disk SubSystem did not respond in a timely fashion try increasing number of cores or decreasing threads by using the ThrottleLimit parameter' -EndTime (Get-Date)
             return
         }
@@ -247,7 +247,7 @@ function Optimize-OneDisk {
 
         if ($defrag -eq $false) {
             Write-VhdOutput -DiskState 'Defragmentation of the disk failed' -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
+            $mount | DisMount-FslDisk -SetLastWriteTime $lastWriteTime
             return
         }
 
@@ -257,13 +257,13 @@ function Optimize-OneDisk {
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
         if ( $partitionSize.SizeMin -gt $disk.Length ) {
             Write-VhdOutput -DiskState "Skipped - Disk Already at Minimum Size" -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
+            $mount | DisMount-FslDisk -SetLastWriteTime $lastWriteTime
             return
         }
 
         if (($partitionsize.SizeMin / $disk.Length) -gt (1 - $RatioFreeSpace) ) {
             Write-VhdOutput -DiskState "Less Than $(100*$RatioFreeSpace)% Free Inside Disk" -EndTime (Get-Date)
-            $mount | DisMount-FslDisk
+            $mount | DisMount-FslDisk -SetLastWriteTime $lastWriteTime
             return
         }
 
@@ -321,15 +321,18 @@ function Optimize-OneDisk {
 
         If ($success -ne $true) {
             Write-VhdOutput -DiskState "Disk Shrink Failed" -EndTime (Get-Date)
+            (Get-Item $Disk.FullName -ErrorAction Stop).LastWriteTimeUtc = $LastWriteTime
             Remove-Item $tempFileName
             return
         }
 
         If ($originalSize -eq $finalSize) {
             Write-VhdOutput -DiskState "No Shrink Achieved" -EndTime (Get-Date)
+            (Get-Item $Disk.FullName -ErrorAction Stop).LastWriteTimeUtc = $LastWriteTime
             return
         }
 
+        (Get-Item $Disk.FullName -ErrorAction Stop).LastWriteTimeUtc = $LastWriteTime
         Write-VhdOutput -DiskState "Success" -FinalSize $finalSize -EndTime (Get-Date)
     } #Process
     END { } #End
