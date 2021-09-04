@@ -245,6 +245,10 @@ BEGIN {
         $LogFilePath.Replace('.csv', '.json')
     }
 
+    if ($Analyze) {
+        Write-Warning "Running this switch with the Analyze switch is read only and cannot anticipate the consequences of defrag on the shrink.  Thus will considerably underestimate the possible capacity savings"
+    }
+
 } # Begin
 PROCESS {
 

@@ -36,9 +36,9 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $paramMountDiskImage = [PSCustomObject]@{
+            $paramMountDiskImage = @{
                 ImagePath = $Path
-                NoDriveeLetter = $true
+                NoDriveLetter = $true
                 PassThru = $true
                 ErrorAction = 'Stop'
             }
