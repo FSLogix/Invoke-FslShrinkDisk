@@ -246,7 +246,7 @@ BEGIN {
     }
 
     if ($Analyze) {
-        Write-Warning "Running this switch with the Analyze switch is read only and cannot anticipate the consequences of defrag on the shrink.  Thus will considerably underestimate the possible capacity savings"
+        Write-Warning "Running this script with the Analyze switch is a rough guide only as it makes no changes to the disk.  Even though the disk is mounted to predict the shrink, it is mounted with read only Access"
     }
 
 } # Begin
