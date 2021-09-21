@@ -228,7 +228,7 @@ BEGIN {
             Write-Information "Number of threads (ThrotttleLimit) can be used on this system to speed up processing"
         }
         ($ThrottleLimit -le 4 ) {
-            Write-Warning "Number of threads($ThrottleLimit) in use on this machine is low, increase cores/threads to increase processing speeed"
+            Write-Warning "Number of threads ($ThrottleLimit) in use on this machine is low, increase cores/threads to increase processing speeed"
         }
         Default {}
     }
