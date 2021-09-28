@@ -66,7 +66,13 @@ function Optimize-OneDisk {
         'DiskPart compactó correctamente el archivo de disco virtual.',
         'Die Datei für virtuelle Datenträger wurde von DiskPart erfolgreich komprimiert.'
 
-        function Get-FslPartSize ($GeneralTimeout) {
+        function Get-FslPartSize {
+            [CmdletBinding()]
+            param(
+                $GeneralTimeout,
+                [switch]$FixDisk
+            )
+
             $partSize = $false
             $timespan = (Get-Date).AddSeconds($GeneralTimeout)
             while ($partSize -eq $false -and $timespan -gt (Get-Date)) {
@@ -76,7 +82,8 @@ function Optimize-OneDisk {
                 }
                 catch {
                     $e = $error[0]
-                    if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*") {
+                    #FSLogix disks have a small chanch of needing repaired/chkdsk to be run, this is to automate that.s
+                    if ($e.ToString() -like "Cannot shrink a partition containing a volume with errors*" -and $FixDisk) {
                         Get-Volume -Partition $partInfo -ErrorAction SilentlyContinue | Repair-Volume | Out-Null
                     }
 
@@ -91,14 +98,11 @@ function Optimize-OneDisk {
                 }
             }
 
-            if ($partSize -eq $false) {
-                #$partInfo | Export-Clixml -Path "$env:TEMP\ForJim-$($Disk.Name).xml"
-                Write-VhdOutput -DiskState 'No Supported Size Info for partition - Disk may be corrupt' -EndTime (Get-Date)
-                $mount | DisMount-FslDisk
-                Write-Output
-                return
+            switch ($true) {
+                ((-not $partsize) -and $FixDisk) { Write-Error 'No Supported Size Info for partition - Disk may be corrupt - repair was attempted'}
+                (-not $partsize) { Write-Error 'No Supported Size Info for partition' }
+                Default { }
             }
-            #TODO proper output for this function
 
             Write-Output $partitionSize
         }
@@ -206,11 +210,19 @@ function Optimize-OneDisk {
 
         #Output Analyze disk results here and dismount read only disk mount
         if ($Analyze) {
-            $partitionSize = Get-FslPartSize -GeneralTimeout $GeneralTimeout
+            $partitionSize = try {
+                Get-FslPartSize -GeneralTimeout $GeneralTimeout -ErrorAction Stop
+            }
+            catch {
+                $err = $error[0]
+                Write-VhdOutput -DiskState $err.ToString() -EndTime (Get-Date)
+                $mount | DisMount-FslDisk
+                return
+            }
             if ($partitionSize.SizeMin -gt $disk.Length) {
                 $finalSizeAnalyze = $disk.Length
             }
-            else{
+            else {
                 $finalSizeAnalyze = $partitionSize.SizeMin
             }
             $mount | DisMount-FslDisk
@@ -252,7 +264,15 @@ function Optimize-OneDisk {
         }
 
         #Grab partition information
-        $partitionSize = Get-FslPartSize -GeneralTimeout $GeneralTimeout
+        $partitionSize = try {
+            Get-FslPartSize -GeneralTimeout $GeneralTimeout -FixDisk -ErrorAction Stop
+        }
+        catch {
+                $err = $error[0]
+                Write-VhdOutput -DiskState $err.ToString() -EndTime (Get-Date)
+                $mount | DisMount-FslDisk
+                return
+        }
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk
         if ( $partitionSize.SizeMin -gt $disk.Length ) {

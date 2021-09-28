@@ -115,10 +115,8 @@ Describe "Describing Optimize-OneDisk" {
 
     }
 
-    Context "Works in French" {
-
-        It "Works in French" {
-            Mock -CommandName invoke-diskpart -MockWith { $french }
+    Context "Works in Other Languages" {
+        BeforeAll {
             Mock -CommandName Get-Partition -MockWith { [PSCustomObject]@{
                     Type            = 'Basic'
                     Guid            = $guid
@@ -137,7 +135,38 @@ Describe "Describing Optimize-OneDisk" {
                     ObjectId = $guid
                 } }
             Mock -CommandName Optimize-Volume -MockWith { 'test' }
+        }
 
+        It "Works in French" {
+            Mock -CommandName invoke-diskpart -MockWith { $french }
+            $paramShrinkOneDisk = @{
+                Disk                = $Disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+                Passthru            = $true
+                GeneralTimeout      = 60
+            }
+            Optimize-OneDisk @paramShrinkOneDisk | Select-Object -ExpandProperty DiskState | Should -Be 'No Shrink Achieved'
+        }
+
+        It "Works in Spanish" {
+            Mock -CommandName invoke-diskpart -MockWith { $spanish }
+            $paramShrinkOneDisk = @{
+                Disk                = $Disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+                Passthru            = $true
+                GeneralTimeout      = 60
+            }
+            Optimize-OneDisk @paramShrinkOneDisk | Select-Object -ExpandProperty DiskState | Should -Be 'No Shrink Achieved'
+        }
+
+        It "Works in German" {
+            Mock -CommandName invoke-diskpart -MockWith { $german }
             $paramShrinkOneDisk = @{
                 Disk                = $Disk
                 DeleteOlderThanDays = $DeleteOlderThanDays
@@ -311,7 +340,7 @@ Describe "Describing Optimize-OneDisk" {
 
     Context "Partition Size" {
 
-        It "Gives right output when no Supported Size Info for partition" -Tag 'Current' {
+        It "Gives right output when no Supported Size Info for partition" {
 
             Mock -CommandName Get-PartitionSupportedSize -MockWith { Write-Error 'NoPartSize' }
 
@@ -324,7 +353,7 @@ Describe "Describing Optimize-OneDisk" {
             }
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
             Select-Object -ExpandProperty DiskState |
-            Should -Be 'No Supported Size Info for partition - Disk may be corrupt'
+            Should -BeLike "No Supported Size Info for partition - Disk may be corrupt*"
         }
     }
 
