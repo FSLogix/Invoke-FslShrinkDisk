@@ -14,7 +14,7 @@ BeforeAll {
     . "$here\Functions\Private\Mount-FslDisk.ps1"
     . "$here\Functions\Private\Dismount-FslDisk.ps1"
 
-    #Adding enpty function so that the mock works
+    #Adding empty function so that the mock works
     function invoke-diskpart ($Path) {
     }
 
@@ -51,7 +51,7 @@ Describe "Describing Optimize-OneDisk" {
                 SizeMax = $SizeMax
             }
         }
-        Mock -CommandName Get-ChildItem -MockWith { $disk }
+        Mock -CommandName Get-ChildItem -MockWith { $disk } -ParameterFilter { $Name -ne $true }
         Mock -CommandName Remove-Item -MockWith { $null }
         Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -ne $SizeMax }
         Mock -CommandName Resize-Partition -MockWith { $null }
@@ -180,7 +180,7 @@ Describe "Describing Optimize-OneDisk" {
         }
     }
 
-    Context "Not Disk" {
+    Context "quit when not disk or disk is in use with cloud cache" {
 
         It "Gives right output when not disk" {
             $paramShrinkOneDisk = @{
@@ -192,6 +192,37 @@ Describe "Describing Optimize-OneDisk" {
             }
 
             Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop | Select-Object -ExpandProperty DiskState | Should -Be 'File Is Not a Virtual Hard Disk format with extension vhd or vhdx'
+        }
+
+        It "Gives right output when rw disk present" {
+            $paramShrinkOneDisk = @{
+                Disk                = $Disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+            }
+            New-Item "TestDrive:\rw.vhdx" -ItemType 'File'
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Disk has a current rw or merge disk associated*"
+        }
+
+        It "Gives right output when merge disk present" {
+            $paramShrinkOneDisk = @{
+                Disk                = $Disk
+                DeleteOlderThanDays = $DeleteOlderThanDays
+                IgnoreLessThanGB    = $IgnoreLessThanGB
+                LogFilePath         = $LogFilePath
+                RatioFreeSpace      = 0.2
+            }
+            Remove-Item "TestDrive:\rw.vhdx" -Force -ErrorAction SilentlyContinue | Out-Null
+            New-Item "TestDrive:\merge.vhdx" -ItemType 'File'
+
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -BeLike "Disk has a current rw or merge disk associated*"
         }
     }
 
@@ -453,7 +484,7 @@ Describe "Describing Optimize-OneDisk" {
             Mock -CommandName Get-ChildItem -MockWith { [PSCustomObject]@{
                     Length = 1
                 }
-            }
+            } -ParameterFilter { $Name -ne $true }
 
             $paramShrinkOneDisk = @{
                 Disk             = $Disk

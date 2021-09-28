@@ -144,6 +144,13 @@ function Optimize-OneDisk {
             return
         }
 
+        $folderContents = Get-ChildItem $Disk.Directory -Name
+
+        if ($folderContents -contains 'rw.vhdx' -or $folderContents -contains 'Merge.vhdx') {
+            Write-VhdOutput -DiskState 'Disk has a current rw or merge disk associated and cannot be shrunk at this time' -EndTime (Get-Date)
+            return
+        }
+
         #If it's older than x days delete disk
         If ( $DeleteOlderThanDays ) {
             #Last Access time isn't always reliable if diff disks are used so lets be safe and use the most recent of access and write
