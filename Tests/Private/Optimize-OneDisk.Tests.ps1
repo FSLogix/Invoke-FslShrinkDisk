@@ -431,6 +431,22 @@ Describe "Describing Optimize-OneDisk" {
         }
     }
 
+    Context "Analyze"{
+        It "Returns Analyze in the Object" -Tag 'Current' {
+            $paramShrinkOneDisk = @{
+                Disk             = $Disk
+                IgnoreLessThanGB = $IgnoreLessThanGB
+                LogFilePath      = $LogFilePath
+                RatioFreeSpace   = 0.2
+                GeneralTimeout   = 1
+                Analyze = $true
+            }
+            Optimize-OneDisk @paramShrinkOneDisk -Passthru -ErrorAction Stop |
+            Select-Object -ExpandProperty DiskState |
+            Should -Be "Analyze"
+        }
+    }
+
     Context "Output" {
         BeforeAll {
 
