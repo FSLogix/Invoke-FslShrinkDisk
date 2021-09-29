@@ -1,5 +1,4 @@
 BeforeAll {
-
     $here = Split-Path -Parent $PSCommandPath
     $funcType = Split-Path $here -Leaf
     $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'

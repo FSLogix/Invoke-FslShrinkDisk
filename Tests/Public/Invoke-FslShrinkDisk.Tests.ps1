@@ -2,8 +2,9 @@ BeforeAll {
     $here = Split-Path -Parent $PSCommandPath
     $sut = (Split-Path -Leaf $PSCommandPath) -replace '\.Tests\.', '.'
     $here = $here | Split-Path -Parent | Split-Path -Parent
-    $script = Get-Content "$here\$sut"
-    $tstdrvPath = "$env:temp\Invoke-FslShrinkDisk.ps1"
+    $public = Join-Path $here 'Functions\Public'
+    $script = Get-Content "$public\$sut"
+    $tstdrvPath = Join-Path $public "TempInvoke-FslShrinkDisk.ps1"
     Set-Content 'function Invoke-FslShrinkDisk {' -Path $tstdrvPath
     Add-Content -Path $tstdrvPath $script
     Add-Content -Path $tstdrvPath '}'
@@ -13,6 +14,7 @@ BeforeAll {
     . "$here\Functions\Private\Optimize-OneDisk.ps1"
     . "$here\Functions\Private\Write-VhdOutput.ps1"
     . "$here\Functions\Private\Test-FslDependencies.ps1"
+    . $tstdrvPath
 }
 
 Describe 'Invoke-FslShrinkDisk' {
@@ -47,6 +49,11 @@ Describe 'Invoke-FslShrinkDisk' {
                 Name     = 'FakeDisk.vhd'
             }
         }
+        Mock -CommandName Get-Item -MockWith {
+            [PSCustomObject]@{
+                Attributes = 'Archive'
+            }
+        }
         Mock -CommandName Test-FslDependencies -MockWith { $null }
         Mock -CommandName Dismount-FslDisk -MockWith { $null }
         Mock -CommandName Write-VhdOutput -MockWith { $null }
@@ -59,8 +66,20 @@ Describe 'Invoke-FslShrinkDisk' {
     It "Does not error" {
         Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -ErrorAction Stop
     }
-
-    It 'Takes Input via pipeline'{
-        'TestDrive:\FakeDisk.vhd' | Invoke-FslShrinkDisk
+    It "Copes with Throttlelimit too high" {
+        $result = Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -PassThru -ThrottleLimit 64
+        $result.DiskState | Should -Be 'Success'
+    }
+    It "Copes with Throttlelimit too low" {
+        $result = Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -PassThru -ThrottleLimit 1
+        $result.DiskState | Should -Be 'Success'
+    }
+    It "Corrects logfile extension" {
+        $result = Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -PassThru -JSONFormat
+        $result.DiskState | Should -Be 'Success'
+    }
+    It "Recursiveky searches" {
+        $result = Invoke-FslShrinkDisk -Path 'TestDrive:\FakeDisk.vhd' -PassThru -Recurse
+        $result.DiskState | Should -Be 'Success'
     }
 }
