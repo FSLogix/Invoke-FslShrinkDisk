@@ -15,6 +15,7 @@ testmultithread.ps1
 startlog.ps1
 SetupTestManyThreads.ps1
 TempInvoke-FslShrinkDisk.ps1
+Testusing.ps1
 
 # Test results
 CodeCoverage.xml

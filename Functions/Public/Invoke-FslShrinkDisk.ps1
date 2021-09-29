@@ -326,4 +326,45 @@ PROCESS {
     }
 
 } #Process
-END { } #End
+END {
+
+    if ($JSONFormat) {
+        $result = Get-Content -Path $LogFilePath | ConvertFrom-Json
+    }
+    else {
+        $result = Import-Csv $LogFilePath
+    }
+
+    $startTime = $result.StartTime | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum
+    $endTime = $result.EndTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+
+    $notError = 'Success', 'Analyze', 'Disk Deleted', "Disk Ignored as it is smaller than $IgnoreLessThanGB GB", 'Skipped - Disk Already at Minimum Size', "Less Than $(100*$RatioFreeSpace)% Free Inside Disk", 'No Shrink Achieved'
+
+    $shinkErrors = $result | Where-Object { $notError -notcontains $_.DiskState }
+    $topError = $shinkErrors | Group-Object | Sort-Object | Select-Object -First 1
+    $sysInfo = Get-ComputerInfo
+
+    $summary = [PSCustomObject]@{
+        StartTime          = $startTime
+        EndTime            = $endTime
+        TimeElasped        = $endTime - $startTime
+        TotalTimeTaken     = $result.'ElapsedTime(s)' | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TotalOriginalSize  = $result.OriginalSizeGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TotalFinalSize     = $result.FinalSizeGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        NumberOfDisks      = $result.Count
+        TotalSpaceSaved    = $result.SpaceSavedGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TopError           = $topError
+        NumberOfErrors     = $shinkErrors.Count
+        WindowsProductName = $sysInfo.WindowsProductName
+        WindowsVersion     = $sysInfo.WindowsVersion
+    }
+
+    $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
+    $nonAnonInfo = [PSCustomObject]@{
+        Domain = $sysInfo.CsDomain
+        UserName = $sysInfo.CsUserName
+        FullName = $usrInfo.FullName
+        WindowsRegisteredOrganization = $sysInfo.WindowsRegisteredOrganization
+    }
+
+} #End
