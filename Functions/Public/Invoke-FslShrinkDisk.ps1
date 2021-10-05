@@ -339,13 +339,25 @@ END {
         return
     }
 
+    $regPath = 'HKCU:\SOFTWARE\Invoke-FslShrinkDisk'
+
+    $guid = Get-ItemPropertyValue -Path $regPath -Name Guid -ErrorAction SilentlyContinue
+
+    if (-not $guid) {
+        $guid = New-Guid
+        if (-not (Test-Path $regPath)) {
+            New-Item $regPath | Out-Null
+        }
+        New-ItemProperty -Path $regPath -Name Guid -Value $guid | Out-Null
+    }
+
     if ($JSONFormat) {
         $result = Get-Content -Path $LogFilePath | ConvertFrom-Json
     }
     else {
         $csvresult = Import-Csv $LogFilePath
         $result = $csvresult | ForEach-Object {
-            $backconvertCsv = [PSCustomObject][Ordered]@{
+            $backConvertCsv = [PSCustomObject][Ordered]@{
                 Name         = $_.Name
                 StartTime    = ([DateTime]$_.StartTime).GetDateTimeFormats()[18]
                 EndTime      = ([DateTime]$_.EndTime).GetDateTimeFormats()[18]
@@ -358,7 +370,7 @@ END {
                 FullName     = $_.FullName
             }
 
-            Write-Output $backconvertCsv
+            Write-Output $backConvertCsv
         }
     }
 
@@ -382,9 +394,10 @@ END {
         TotalSpaceSaved    = $result.SpaceSaved | Measure-Object -Sum | Select-Object -ExpandProperty Sum
         AverageMaxDiskSize = $result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average
         TopError           = $topError
-        NumberOfErrors     = $shinkErrors| Measure-Object | Select-Object -ExpandProperty Count
+        NumberOfErrors     = $shinkErrors | Measure-Object | Select-Object -ExpandProperty Count
         WindowsProductName = $sysInfo.WindowsProductName
         WindowsVersion     = $sysInfo.WindowsVersion
+        Guid               = $guid
     }
 
     if ($FeedBack -eq 'Full') {
@@ -397,6 +410,6 @@ END {
         }
     }
 
-        #TODO add REST Method
+    #TODO add REST Method
 
 } #End
