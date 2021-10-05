@@ -99,7 +99,7 @@ function Optimize-OneDisk {
             }
 
             switch ($true) {
-                ((-not $partsize) -and $FixDisk) { Write-Error 'No Supported Size Info for partition - Disk may be corrupt - repair was attempted'}
+                ((-not $partsize) -and $FixDisk) { Write-Error 'No Supported Size Info for partition - Disk may be corrupt - repair was attempted' }
                 (-not $partsize) { Write-Error 'No Supported Size Info for partition' }
                 Default { }
             }
@@ -123,6 +123,9 @@ function Optimize-OneDisk {
         #Grab size of disk being processed
         $originalSize = $Disk.Length
 
+        #Grab Max size of disk
+        $diskImageData = Get-DiskImage $Disk.FullName
+
         #Grab Last Write Time in Utc
         $lastWriteTime = $Disk.LastWriteTimeUtc
 
@@ -134,6 +137,7 @@ function Optimize-OneDisk {
             "Write-VhdOutput:DiskState"    = $null
             "Write-VhdOutput:OriginalSize" = $originalSize
             "Write-VhdOutput:FinalSize"    = $originalSize
+            "Write-VhdOutput:MaxSize"      = $diskImageData.Size
             "Write-VhdOutput:FullName"     = $Disk.FullName
             "Write-VhdOutput:Passthru"     = $Passthru
         }
@@ -275,10 +279,10 @@ function Optimize-OneDisk {
             Get-FslPartSize -GeneralTimeout $GeneralTimeout -FixDisk -ErrorAction Stop
         }
         catch {
-                $err = $error[0]
-                Write-VhdOutput -DiskState $err.ToString() -EndTime (Get-Date)
-                $mount | DisMount-FslDisk
-                return
+            $err = $error[0]
+            Write-VhdOutput -DiskState $err.ToString() -EndTime (Get-Date)
+            $mount | DisMount-FslDisk
+            return
         }
 
         #If you can't shrink the partition much, you can't reclaim a lot of space, so skipping if it's not worth it. Otherwise shink partition and dismount disk

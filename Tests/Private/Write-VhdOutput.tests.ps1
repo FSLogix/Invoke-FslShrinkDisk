@@ -11,13 +11,17 @@ Describe "Describing Write-VhdOutput" {
     BeforeAll {
         $time = Get-Date
         $path = 'TestDrive:\ICareNot.csv'
+        $maxSize = 30
+        $currentSize = 20
+        $finalSize = 1
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $param = @{
             Path         = $path
             Name         = 'Jim.vhdx'
             DiskState    = 'TooBig'
-            OriginalSize = 40 * 1024 * 1024 * 1024
-            FinalSize    = 1 * 1024 * 1024 * 1024
+            OriginalSize = $CurrentSize * 1024 * 1024 * 1024
+            FinalSize    = $FinalSize * 1024 * 1024 * 1024
+            MaxSize      = $MaxSize
             FullName     = "TestDrive:\Jim.vhdx"
             Passthru     = $true
             Starttime    = $time
@@ -36,7 +40,7 @@ Describe "Describing Write-VhdOutput" {
 
     It 'Calculates Space Reduction' {
         $r = Write-VhdOutput @param
-        $r.SpaceSavedGB | Should -Be 39
+        $r.'SpaceSaved(GiB)' | Should -Be ($currentSize - $finalSize)
     }
 
     It 'Creates a csv' {
@@ -66,6 +70,18 @@ Describe "Describing Write-VhdOutput" {
 
     It 'Take less than a second to run' {
         (Measure-Command { Write-VhdOutput @param | Out-Null }).TotalSeconds | Should -BeLessThan 1
+    }
+
+    It 'Does Not Create a csv' {
+        $path4 = 'TestDrive:\NoFile.csv'
+        Write-VhdOutput @param -Path $path4 -NoFile | Out-Null
+        Test-Path $path4 | Should -BeFalse
+    }
+
+    It 'Does Not Create a JSON File' {
+        $path5 = 'TestDrive:\NoJsonFile.csv'
+        Write-VhdOutput @param -Path $path5 -NoFile | Out-Null
+        Test-Path $path5 | Should -BeFalse
     }
 
 }

@@ -175,7 +175,13 @@ Param (
     [Parameter(
         ValuefromPipelineByPropertyName = $true
     )]
-    [Switch]$JSONFormat
+    [Switch]$JSONFormat,
+
+    [Parameter(
+        ValuefromPipelineByPropertyName = $true
+    )]
+    [ValidateSet('Full', 'Anon', 'None')]
+    [string]$FeedBack = 'Anon'
 )
 
 BEGIN {
@@ -328,11 +334,32 @@ PROCESS {
 } #Process
 END {
 
+    if ($FeedBack -eq 'None') {
+        Write-Information 'No feedback sent'
+        return
+    }
+
     if ($JSONFormat) {
         $result = Get-Content -Path $LogFilePath | ConvertFrom-Json
     }
     else {
-        $result = Import-Csv $LogFilePath
+        $csvresult = Import-Csv $LogFilePath
+        $result = $csvresult | ForEach-Object {
+            $backconvertCsv = [PSCustomObject][Ordered]@{
+                Name         = $_.Name
+                StartTime    = ([DateTime]$_.StartTime).GetDateTimeFormats()[18]
+                EndTime      = ([DateTime]$_.EndTime).GetDateTimeFormats()[18]
+                ElapsedTime  = $_.'ElapsedTime(s)'
+                DiskState    = $_.DiskState
+                OriginalSize = [math]::Round( [double]$_.'OriginalSize(GiB)' * 1024 * 1024 * 1024, 0 )
+                FinalSize    = [math]::Round( [double]$_.'FinalSize(GiB)' * 1024 * 1024 * 1024, 0 )
+                MaxSize      = [math]::Round( [double]$_.'MaxSize(GiB)' * 1024 * 1024 * 1024, 0 )
+                SpaceSaved   = [math]::Round( [double]$_.'SpaceSaved(GiB)' * 1024 * 1024 * 1024, 0 )
+                FullName     = $_.FullName
+            }
+
+            Write-Output $backconvertCsv
+        }
     }
 
     $startTime = $result.StartTime | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum
@@ -341,30 +368,35 @@ END {
     $notError = 'Success', 'Analyze', 'Disk Deleted', "Disk Ignored as it is smaller than $IgnoreLessThanGB GB", 'Skipped - Disk Already at Minimum Size', "Less Than $(100*$RatioFreeSpace)% Free Inside Disk", 'No Shrink Achieved'
 
     $shinkErrors = $result | Where-Object { $notError -notcontains $_.DiskState }
-    $topError = $shinkErrors | Group-Object | Sort-Object | Select-Object -First 1
+    $topError = $shinkErrors | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1
     $sysInfo = Get-ComputerInfo
 
     $summary = [PSCustomObject]@{
         StartTime          = $startTime
         EndTime            = $endTime
-        TimeElasped        = $endTime - $startTime
-        TotalTimeTaken     = $result.'ElapsedTime(s)' | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        TotalOriginalSize  = $result.OriginalSizeGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        TotalFinalSize     = $result.FinalSizeGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TimeElasped        = ([DateTime]$endTime - [DateTime]$startTime).ToString()
+        TotalTimeTaken     = $result.ElapsedTime | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TotalOriginalSize  = $result.OriginalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TotalFinalSize     = $result.FinalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum
         NumberOfDisks      = $result.Count
-        TotalSpaceSaved    = $result.SpaceSavedGB | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        TotalSpaceSaved    = $result.SpaceSaved | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+        AverageMaxDiskSize = $result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average
         TopError           = $topError
-        NumberOfErrors     = $shinkErrors.Count
+        NumberOfErrors     = $shinkErrors| Measure-Object | Select-Object -ExpandProperty Count
         WindowsProductName = $sysInfo.WindowsProductName
         WindowsVersion     = $sysInfo.WindowsVersion
     }
 
-    $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
-    $nonAnonInfo = [PSCustomObject]@{
-        Domain = $sysInfo.CsDomain
-        UserName = $sysInfo.CsUserName
-        FullName = $usrInfo.FullName
-        WindowsRegisteredOrganization = $sysInfo.WindowsRegisteredOrganization
+    if ($FeedBack -eq 'Full') {
+        $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
+        $nonAnonInfo = [PSCustomObject]@{
+            Domain                        = $sysInfo.CsDomain
+            UserName                      = $sysInfo.CsUserName
+            FullName                      = $usrInfo.FullName
+            WindowsRegisteredOrganization = $sysInfo.WindowsRegisteredOrganization
+        }
     }
+
+        #TODO add REST Method
 
 } #End

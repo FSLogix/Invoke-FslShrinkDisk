@@ -30,6 +30,11 @@ function Write-VhdOutput {
         [Parameter(
             Mandatory = $true
         )]
+        [System.String]$MaxSize,
+
+        [Parameter(
+            Mandatory = $true
+        )]
         [System.String]$FullName,
 
         [Parameter(
@@ -48,7 +53,11 @@ function Write-VhdOutput {
 
         [Parameter(
         )]
-        [Switch]$JSONFormat
+        [Switch]$JSONFormat,
+
+        [Parameter(
+        )]
+        [Switch]$NoFile
     )
 
     BEGIN {
@@ -58,15 +67,16 @@ function Write-VhdOutput {
 
         #unit conversion and calculation should happen in output function
         $csvOutput = [PSCustomObject]@{
-            Name             = $Name
-            StartTime        = $StartTime.ToLongTimeString()
-            EndTime          = $EndTime.ToLongTimeString()
-            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
-            DiskState        = $DiskState
-            OriginalSizeGB   = [math]::Round( $OriginalSize / 1GB, 2 )
-            FinalSizeGB      = [math]::Round( $FinalSize / 1GB, 2 )
-            SpaceSavedGB     = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
-            FullName         = $FullName
+            Name                = $Name
+            StartTime           = $StartTime.ToLongTimeString()
+            EndTime             = $EndTime.ToLongTimeString()
+            'ElapsedTime(s)'    = [math]::Round(($EndTime - $StartTime).TotalSeconds, 1)
+            DiskState           = $DiskState
+            'OriginalSize(GiB)' = [math]::Round( $OriginalSize / 1GB, 2 )
+            'FinalSize(GiB)'    = [math]::Round( $FinalSize / 1GB, 2 )
+            'MaxSize(GiB)'      = [math]::Round( $MaxSize / 1GB, 2 )
+            'SpaceSaved(GiB)'   = [math]::Round( ($OriginalSize - $FinalSize) / 1GB, 2 )
+            FullName            = $FullName
         }
 
         #JSON output is meant to be machine readable so times are changed to timestamps and sizes left in Bytes
@@ -78,6 +88,7 @@ function Write-VhdOutput {
             DiskState        = $DiskState
             OriginalSize     = $OriginalSize
             FinalSize        = $FinalSize
+            MaxSize          = $MaxSize
             SpaceSaved       = $OriginalSize - $FinalSize
             FullName         = $FullName
         }
@@ -93,10 +104,15 @@ function Write-VhdOutput {
 
         if ($JSONFormat) {
             $logMessage = $jsonOutput | ConvertTo-Json -Compress
-            $logMessage | Add-Content -Path $Path -ErrorAction Stop
+            if (-not $NoFile) {
+                $logMessage | Add-Content -Path $Path -ErrorAction Stop
+            }
+
         }
         else {
-            $csvOutput | Export-Csv -Path $Path -NoClobber -Append -NoTypeInformation -Force -ErrorAction Stop
+            if (-not $NoFile) {
+                $csvOutput | Export-Csv -Path $Path -NoClobber -Append -NoTypeInformation -Force -ErrorAction Stop
+            }
         }
 
     } #Process
