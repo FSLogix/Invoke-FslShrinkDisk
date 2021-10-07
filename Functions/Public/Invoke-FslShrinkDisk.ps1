@@ -376,6 +376,8 @@ END {
 
     $startTime = $result.StartTime | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum
     $endTime = $result.EndTime | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+    $secondsTaken = $result.ElapsedTime | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+    $totalTimeTaken = ([timespan]::fromseconds($secondsTaken)).ToString("hh\:mm\:ss")
 
     $notError = 'Success', 'Analyze', 'Disk Deleted', "Disk Ignored as it is smaller than $IgnoreLessThanGB GB", 'Skipped - Disk Already at Minimum Size', "Less Than $(100*$RatioFreeSpace)% Free Inside Disk", 'No Shrink Achieved'
 
@@ -383,23 +385,44 @@ END {
     $topError = $shinkErrors | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1
     $sysInfo = Get-ComputerInfo
 
-    $summary = [PSCustomObject]@{
-        StartTime          = $startTime
-        EndTime            = $endTime
-        TimeElasped        = ([DateTime]$endTime - [DateTime]$startTime).ToString()
-        TotalTimeTaken     = $result.ElapsedTime | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        TotalOriginalSize  = $result.OriginalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        TotalFinalSize     = $result.FinalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        NumberOfDisks      = $result.Count
-        TotalSpaceSaved    = $result.SpaceSaved | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-        AverageMaxDiskSize = $result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average
-        TopError           = $topError
-        NumberOfErrors     = $shinkErrors | Measure-Object | Select-Object -ExpandProperty Count
-        WindowsProductName = $sysInfo.WindowsProductName
-        WindowsVersion     = $sysInfo.WindowsVersion
-        Guid               = $guid
+    #TODO Remove
+    $debugConn = $false
+    if ($debugConn) {
+        $connString = 'Server=tcp:shrinkdisk.database.windows.net,1433;Initial Catalog=ShrinkRuns;Persist Security Info=True'
+        $cred = Get-Credential -Message "Enter your SQL Auth credentials"
+        $cred.Password.MakeReadOnly()
+        $sqlcred = New-Object -TypeName System.Data.SqlClient.SqlCredential -ArgumentList $cred.UserName, $cred.Password
+        $sqlcc = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList  $connString, $sqlcred
+        $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
+        $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
+        $db = $srv.Databases["ShrinkRuns"]
+        $table = $db.Tables["Summary"]
     }
 
+    $summary = [PSCustomObject][Ordered]@{
+        StartTime          = [datetime]$startTime
+        EndTime            = [datetime]$endTime
+        TimeElasped        = ([DateTime]$endTime - [DateTime]$startTime).ToString()
+        TotalTimeTaken     = $totalTimeTaken
+        TotalOriginalSize  = [int64]($result.OriginalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum)
+        TotalFinalSize     = [int64]($result.FinalSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum)
+        TotalSpaceSaved    = [int64]($result.SpaceSaved | Measure-Object -Sum | Select-Object -ExpandProperty Sum)
+        AverageMaxDiskSize = [Int64]($result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average)
+        NumberOfDisks      = [int]$result.Count
+        NumberOfErrors     = [int]($shinkErrors | Measure-Object | Select-Object -ExpandProperty Count)
+        TopError           = if (-Not $topError) { 'NULL' } else { $topError }
+        WindowsProductName = $sysInfo.WindowsProductName
+        WindowsVersion     = $sysInfo.WindowsVersion
+        CustGuid           = [guid]$guid
+    }
+    #TODO Remove
+    if ($debugConn) {
+        #$data = Import-Clixml $xmlPath
+        Write-SqlTableData -InputData $summary -InputObject $table -Verbose -Passthru
+
+        # Now, we read the data back to verify all went ok.
+        Read-SqlTableData -InputObject $table
+    }
     if ($FeedBack -eq 'Full') {
         $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
         $nonAnonInfo = [PSCustomObject]@{
