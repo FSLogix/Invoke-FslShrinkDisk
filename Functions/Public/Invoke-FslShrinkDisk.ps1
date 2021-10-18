@@ -385,21 +385,7 @@ END {
     $topError = $shinkErrors | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1
     $sysInfo = Get-ComputerInfo
 
-    #TODO Remove
-    $debugConn = $false
-    if ($debugConn) {
-        $connString = 'Server=tcp:shrinkdisk.database.windows.net,1433;Initial Catalog=ShrinkRuns;Persist Security Info=True'
-        $cred = Get-Credential -Message "Enter your SQL Auth credentials"
-        $cred.Password.MakeReadOnly()
-        $sqlcred = New-Object -TypeName System.Data.SqlClient.SqlCredential -ArgumentList $cred.UserName, $cred.Password
-        $sqlcc = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList  $connString, $sqlcred
-        $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
-        $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
-        $db = $srv.Databases["ShrinkRuns"]
-        $table = $db.Tables["Summary"]
-    }
-
-    $summary = [PSCustomObject][Ordered]@{
+    $sqlSummary = [PSCustomObject]@{
         StartTime          = [datetime]$startTime
         EndTime            = [datetime]$endTime
         TimeElasped        = ([DateTime]$endTime - [DateTime]$startTime).ToString()
@@ -415,14 +401,7 @@ END {
         WindowsVersion     = $sysInfo.WindowsVersion
         CustGuid           = [guid]$guid
     }
-    #TODO Remove
-    if ($debugConn) {
-        #$data = Import-Clixml $xmlPath
-        Write-SqlTableData -InputData $summary -InputObject $table -Verbose -Passthru
 
-        # Now, we read the data back to verify all went ok.
-        Read-SqlTableData -InputObject $table
-    }
     if ($FeedBack -eq 'Full') {
         $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
         $nonAnonInfo = [PSCustomObject]@{
@@ -431,7 +410,12 @@ END {
             FullName                      = $usrInfo.FullName
             WindowsRegisteredOrganization = $sysInfo.WindowsRegisteredOrganization
         }
+        $sqlSummary += $nonAnonInfo
     }
+
+    . Functions\Azure\Add-FslDbEntry.ps1
+
+    $sqlSummary | Add-FslDbEntry
 
     #TODO add REST Method
 
