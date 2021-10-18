@@ -140,6 +140,7 @@ function Optimize-OneDisk {
             "Write-VhdOutput:MaxSize"      = $diskImageData.Size
             "Write-VhdOutput:FullName"     = $Disk.FullName
             "Write-VhdOutput:Passthru"     = $Passthru
+            "Write-VhdOutput:JSONFormat"   = $JSONFormat
         }
 
         #Check it is a disk
