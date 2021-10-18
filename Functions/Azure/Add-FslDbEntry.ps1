@@ -102,6 +102,7 @@ function Add-FslDbEntry {
     )
 
     BEGIN {
+        #Requires -Modules SqlServer
         Set-StrictMode -Version Latest
     } # Begin
     PROCESS {
@@ -121,7 +122,8 @@ function Add-FslDbEntry {
         $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
         $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
         $db = $srv.Databases[$InitialCatalog]
-        $table = $db.Tables[$SummaryTable]
+        $SummaryTableObj = $db.Tables[$SummaryTable]
+        $DiskTableObj = $db.Tables[$DiskTable]
 
         $sqlSummary = [PSCustomObject][Ordered]@{
             StartTime                     = $StartTime
@@ -144,12 +146,12 @@ function Add-FslDbEntry {
             WindowsRegisteredOrganization = $WindowsRegisteredOrganization
         }
 
-        $summaryInsert = Write-SqlTableData -InputData $sqlSummary -InputObject $SummaryTable -Passthru
+        $summaryInsert = Write-SqlTableData -InputData $sqlSummary -InputObject $SummaryTableObj -Passthru
 
         if ($DiskLog) {
             $runId = $summaryInsert | Read-SqlTableData | Where-Object { $_.CustGuid -eq $CustGuid } | Sort-Object -Property RunId | Select-Object -Last 1 -ExpandProperty RunId
             $diskData = $DiskLog | Select-Object -Property *, {Name = 'RunId';Expression = $runId}
-            #Write-SqlTableData -InputData $diskData -InputObject $DiskTable
+            Write-SqlTableData -InputData $diskData -InputObject $DiskTableObj
         }
 
     } #Process

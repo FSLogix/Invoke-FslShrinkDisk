@@ -81,16 +81,16 @@ function Write-VhdOutput {
 
         #JSON output is meant to be machine readable so times are changed to timestamps and sizes left in Bytes
         $jsonOutput = [PSCustomObject][Ordered]@{
-            Name             = $Name
-            StartTime        = $StartTime.GetDateTimeFormats()[18]
-            EndTime          = $EndTime.GetDateTimeFormats()[18]
-            'ElapsedTime(s)' = [math]::Round(($EndTime - $StartTime).TotalSeconds, 7)
-            DiskState        = $DiskState
-            OriginalSize     = $OriginalSize
-            FinalSize        = $FinalSize
-            MaxSize          = $MaxSize
-            SpaceSaved       = $OriginalSize - $FinalSize
-            FullName         = $FullName
+            Name         = $Name
+            StartTime    = $StartTime.GetDateTimeFormats()[18]
+            EndTime      = $EndTime.GetDateTimeFormats()[18]
+            ElapsedTime  = [math]::Round(($EndTime - $StartTime).TotalSeconds, 7)
+            DiskState    = $DiskState
+            OriginalSize = $OriginalSize
+            FinalSize    = $FinalSize
+            MaxSize      = $MaxSize
+            SpaceSaved   = $OriginalSize - $FinalSize
+            FullName     = $FullName
         }
 
         if ($Passthru) {

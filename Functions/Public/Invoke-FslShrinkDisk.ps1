@@ -320,7 +320,7 @@ PROCESS {
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
             Analyze             = $Analyze
-            JSONFormat          = $JSONFormat
+            JSONFormat = $JSONFormat
         }
         Optimize-OneDisk @paramOptimizeOneDisk
 
@@ -384,7 +384,13 @@ END {
     $notError = 'Success', 'Analyze', 'Disk Deleted', "Disk Ignored as it is smaller than $IgnoreLessThanGB GB", 'Skipped - Disk Already at Minimum Size', "Less Than $(100*$RatioFreeSpace)% Free Inside Disk", 'No Shrink Achieved'
 
     $shinkErrors = $result | Where-Object { $notError -notcontains $_.DiskState }
-    $topError = ($shinkErrors.DiskState | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1).Name
+    if ($shinkErrors) {
+        $topError = ($shinkErrors.DiskState | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1).Name
+    }
+    else{
+        $topError = $null
+    }
+
     $sysInfo = Get-ComputerInfo
 
     $sqlSummary = @{
@@ -398,7 +404,7 @@ END {
         AverageMaxDiskSize = [Int64]($result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average)
         NumberOfDisks      = [int]$result.Count
         NumberOfErrors     = [int]($shinkErrors | Measure-Object | Select-Object -ExpandProperty Count)
-        TopError           = if (-Not $topError) { $null } else { $topError }
+        TopError           = $topError
         WindowsProductName = $sysInfo.WindowsProductName
         WindowsVersion     = $sysInfo.WindowsVersion
         CustGuid           = [guid]$guid
