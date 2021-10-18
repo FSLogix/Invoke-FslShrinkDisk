@@ -51,6 +51,11 @@ Describe "Describing Optimize-OneDisk" {
                 SizeMax = $SizeMax
             }
         }
+        Mock -CommandName Get-DiskImage -MockWith {
+            [PSCustomObject]@{
+                Size = 32212254720
+            }
+        }
         Mock -CommandName Get-ChildItem -MockWith { $disk } -ParameterFilter { $Name -ne $true }
         Mock -CommandName Remove-Item -MockWith { $null }
         Mock -CommandName Resize-Partition -MockWith { $null } -ParameterFilter { $Size -ne $SizeMax }

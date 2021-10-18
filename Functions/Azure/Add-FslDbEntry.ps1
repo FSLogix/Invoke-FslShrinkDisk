@@ -13,11 +13,11 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [datetime]$TimeElasped,
+        [String]$TimeElasped,
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        $TotalTimeTaken,
+        [String]$TotalTimeTaken,
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
@@ -45,7 +45,7 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [int]$TopError,
+        [string]$TopError,
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
@@ -82,7 +82,7 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [string]$SqlServer = 'tcp:shrinkdisk.database.windows.net',
+        [string]$SqlServer = 'shrinkdisk.database.windows.net',
 
         [Parameter(
             ValuefromPipelineByPropertyName = $true
@@ -106,18 +106,22 @@ function Add-FslDbEntry {
     } # Begin
     PROCESS {
 
-        $debugConn = $false
-        if ($debugConn) {
-            $connString = "Server=tcp:$SqlServer,1433;Initial Catalog=$InitialCatalog;Persist Security Info=True"
-            $cred = Get-Credential -Message "Enter your SQL Auth credentials"
-            $cred.Password.MakeReadOnly()
-            $sqlcred = New-Object -TypeName System.Data.SqlClient.SqlCredential -ArgumentList $cred.UserName, $cred.Password
-            $sqlcc = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList  $connString, $sqlcred
-            $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
-            $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
-            $db = $srv.Databases["$InitialCatalog"]
-            $table = $db.Tables["$SummaryTable"]
-        }
+        #TODO Remove
+        $pw = Get-Content D:\JimM\pw.txt
+        $un = Get-Content D:\JimM\un.txt
+
+        $password = ConvertTo-SecureString $pw -AsPlainText -Force
+        $cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $un, $password
+
+        $connString = "Server=tcp:$SqlServer,1433;Initial Catalog=$InitialCatalog;Persist Security Info=True"
+        #$cred = Get-Credential -Message "Enter your SQL Auth credentials"
+        $cred.Password.MakeReadOnly()
+        $sqlcred = New-Object -TypeName System.Data.SqlClient.SqlCredential -ArgumentList $cred.UserName, $cred.Password
+        $sqlcc = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList  $connString, $sqlcred
+        $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
+        $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
+        $db = $srv.Databases[$InitialCatalog]
+        $table = $db.Tables[$SummaryTable]
 
         $sqlSummary = [PSCustomObject][Ordered]@{
             StartTime                     = $StartTime
@@ -140,8 +144,13 @@ function Add-FslDbEntry {
             WindowsRegisteredOrganization = $WindowsRegisteredOrganization
         }
 
-        Write-SqlTableData -InputData $summary -InputObject $table -Verbose -Passthru
+        $summaryInsert = Write-SqlTableData -InputData $sqlSummary -InputObject $SummaryTable -Passthru
 
+        if ($DiskLog) {
+            $runId = $summaryInsert | Read-SqlTableData | Where-Object { $_.CustGuid -eq $CustGuid } | Sort-Object -Property RunId | Select-Object -Last 1 -ExpandProperty RunId
+            $diskData = $DiskLog | Select-Object -Property *, {Name = 'RunId';Expression = $runId}
+            #Write-SqlTableData -InputData $diskData -InputObject $DiskTable
+        }
 
     } #Process
     END {} #End

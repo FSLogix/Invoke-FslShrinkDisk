@@ -248,7 +248,7 @@ BEGIN {
     }
 
     if ($JSONFormat -and ($logfilePath.EndsWith('.csv'))) {
-        $LogFilePath.Replace('.csv', '.json')
+        $LogFilePath = $LogFilePath.Replace('.csv', '.json')
     }
 
     if ($Analyze) {
@@ -302,6 +302,7 @@ PROCESS {
             PassThru            = $using:PassThru
             RatioFreeSpace      = $using:RatioFreeSpace
             Analyze             = $using:Analyze
+            JSONFormat          = $using:JSONFormat
         }
         Optimize-OneDisk @paramOptimizeOneDisk
 
@@ -319,6 +320,7 @@ PROCESS {
             PassThru            = $PassThru
             RatioFreeSpace      = $RatioFreeSpace
             Analyze             = $Analyze
+            JSONFormat          = $JSONFormat
         }
         Optimize-OneDisk @paramOptimizeOneDisk
 
@@ -382,10 +384,10 @@ END {
     $notError = 'Success', 'Analyze', 'Disk Deleted', "Disk Ignored as it is smaller than $IgnoreLessThanGB GB", 'Skipped - Disk Already at Minimum Size', "Less Than $(100*$RatioFreeSpace)% Free Inside Disk", 'No Shrink Achieved'
 
     $shinkErrors = $result | Where-Object { $notError -notcontains $_.DiskState }
-    $topError = $shinkErrors | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1
+    $topError = ($shinkErrors.DiskState | Group-Object | Sort-Object -Property Count -Descending | Select-Object -First 1).Name
     $sysInfo = Get-ComputerInfo
 
-    $sqlSummary = [PSCustomObject]@{
+    $sqlSummary = @{
         StartTime          = [datetime]$startTime
         EndTime            = [datetime]$endTime
         TimeElasped        = ([DateTime]$endTime - [DateTime]$startTime).ToString()
@@ -396,7 +398,7 @@ END {
         AverageMaxDiskSize = [Int64]($result.MaxSize | Measure-Object -Average | Select-Object -ExpandProperty Average)
         NumberOfDisks      = [int]$result.Count
         NumberOfErrors     = [int]($shinkErrors | Measure-Object | Select-Object -ExpandProperty Count)
-        TopError           = if (-Not $topError) { 'NULL' } else { $topError }
+        TopError           = if (-Not $topError) { $null } else { $topError }
         WindowsProductName = $sysInfo.WindowsProductName
         WindowsVersion     = $sysInfo.WindowsVersion
         CustGuid           = [guid]$guid
@@ -404,18 +406,21 @@ END {
 
     if ($FeedBack -eq 'Full') {
         $usrInfo = Get-LocalUser | Where-Object { $_.Name -eq $sysInfo.CsUserName.split('\')[1] }
-        $nonAnonInfo = [PSCustomObject]@{
+        $nonAnonInfo = @{
             Domain                        = $sysInfo.CsDomain
             UserName                      = $sysInfo.CsUserName
             FullName                      = $usrInfo.FullName
             WindowsRegisteredOrganization = $sysInfo.WindowsRegisteredOrganization
+            DiskLog                       = $result
         }
         $sqlSummary += $nonAnonInfo
     }
 
+    $sqlSummaryObj = [PSCustomObject]$sqlSummary
+
     . Functions\Azure\Add-FslDbEntry.ps1
 
-    $sqlSummary | Add-FslDbEntry
+    $sqlSummaryObj | Add-FslDbEntry
 
     #TODO add REST Method
 
