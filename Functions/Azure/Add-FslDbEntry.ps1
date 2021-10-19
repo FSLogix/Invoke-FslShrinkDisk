@@ -13,11 +13,11 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [String]$TimeElasped,
+        $TimeElasped,
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [String]$TotalTimeTaken,
+        $TotalTimeTaken,
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
@@ -97,7 +97,12 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [string]$DiskTable = 'DiskData'
+        [string]$DiskTable = 'DiskData',
+
+        [Parameter(
+            ValuefromPipelineByPropertyName = $true
+        )]
+        [Int]$TimeOut = 30
 
     )
 
@@ -121,7 +126,18 @@ function Add-FslDbEntry {
         $sqlcc = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList  $connString, $sqlcred
         $sc = New-Object -TypeName Microsoft.SqlServer.Management.Common.ServerConnection -ArgumentList  $sqlcc
         $srv = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server -ArgumentList $sc
-        $db = $srv.Databases[$InitialCatalog]
+
+        $timespan = (Get-Date).AddSeconds($timeout)
+        $dbConnection = $false
+        while ($dbConnection -eq $false -and (Get-Date) -lt $timespan) {
+            try {
+                $db = $srv.Databases[$InitialCatalog]
+                $dbConnection = $true
+            }
+            catch {
+                Start-Sleep 0.1
+            }
+        }
         $SummaryTableObj = $db.Tables[$SummaryTable]
         $DiskTableObj = $db.Tables[$DiskTable]
 
@@ -150,8 +166,25 @@ function Add-FslDbEntry {
 
         if ($DiskLog) {
             $runId = $summaryInsert | Read-SqlTableData | Where-Object { $_.CustGuid -eq $CustGuid } | Sort-Object -Property RunId | Select-Object -Last 1 -ExpandProperty RunId
-            $diskData = $DiskLog | Select-Object -Property *, {Name = 'RunId';Expression = $runId}
-            Write-SqlTableData -InputData $diskData -InputObject $DiskTableObj
+            $diskData = $DiskLog | Select-Object -Property *, @{Name = 'RunId'; Expression = { [int]$runId } }
+            $diskDataOrdered = $diskData | ForEach-Object {
+                #Powershell has put properties in memory efficient order, but we need them in the right order for insertion to sql
+                $out = [PSCustomObject][Ordered]@{
+                    Name         = $_.Name
+                    StartTime    = $_.StartTime
+                    EndTime      = $_.EndTime
+                    ElapsedTime  = $_.ElapsedTime
+                    DiskState    = $_.DiskState
+                    OriginalSize = $_.OriginalSize
+                    FinalSize    = $_.FinalSize
+                    MaxSize      = $_.MaxSize
+                    SpaceSaved   = $_.SpaceSaved
+                    FullName     = $_.FullName
+                    RunId        = [int]$_.RunId
+                }
+                $out
+            }
+            Write-SqlTableData -InputData $diskDataOrdered -InputObject $DiskTableObj
         }
 
     } #Process
