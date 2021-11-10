@@ -102,7 +102,7 @@ function Add-FslDbEntry {
         [Parameter(
             ValuefromPipelineByPropertyName = $true
         )]
-        [Int]$TimeOut = 30
+        [Int]$TimeOut = 60
 
     )
 
@@ -137,6 +137,9 @@ function Add-FslDbEntry {
             catch {
                 Start-Sleep 0.1
             }
+        }
+        if (-not $dbConnection){
+            Write-Error 'Could not contact database'
         }
         $SummaryTableObj = $db.Tables[$SummaryTable]
         $DiskTableObj = $db.Tables[$DiskTable]

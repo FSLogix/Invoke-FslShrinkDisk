@@ -17,6 +17,7 @@ SetupTestManyThreads.ps1
 TempInvoke-FslShrinkDisk.ps1
 Testusing.ps1
 Sql.ps1
+videosetup.ps1
 
 # Test results
 CodeCoverage.xml
