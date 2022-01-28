@@ -806,7 +806,8 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
+            # Pipe Mount-DiskImage into Get-DiskImage, to avoid issues with Mount-DiskImage not returning driveNumber property
+            $MountedDisk = Mount-DiskImage -ImagePath $Path -PassThru -ErrorAction Stop | Get-DiskImage
         }
         catch {
             $e = $error[0]
@@ -832,7 +833,7 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction Continue }
             catch {
                 Write-Error 'Could not dismount Disk Due to no Disknumber'
             }
@@ -845,29 +846,29 @@ function Mount-FslDisk {
         while ($partitionType -eq $false -and $timespan -gt (Get-Date)) {
 
             try {
-                $allPartition = Get-Partition -DiskNumber $mountedDisk.Number -ErrorAction Stop
+                    $allPartition = Get-Partition -DiskNumber $mountedDisk.Number -ErrorAction Stop
 
                 if ($allPartition.Type -contains 'Basic') {
                     $partitionType = $true
                     $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
+                } else {
+                    $partition = $allPartition | Select-Object -Last 1
+                    if ($partition) {
+                        $partitionType = $true
+                    } else {
+                        $partitionType = $false
+                    }
                 }
             }
             catch {
-                if (($allPartition | Measure-Object).Count -gt 0) {
-                    $partition = $allPartition | Select-Object -Last 1
-                    $partitionType = $true
-                }
-                else{
-
-                    $partitionType = $false
-                }
-
+                Write-Error "Cannot get partition information."
             }
+
             Start-Sleep 0.1
         }
 
         if ($partitionType -eq $false) {
-            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction Continue }
             catch {
                 Write-Error 'Could not dismount disk with no partition'
             }
@@ -1150,12 +1151,16 @@ function Optimize-OneDisk {
         $timespan = (Get-Date).AddSeconds(120)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
-            try {
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
-            }
-            catch {
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
+            if (! $partinfo) {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction SilentlyContinue | Select-Object -Last 1
             }
+            try { 
+                Get-Variable -Name $partinfo -ErrorAction SilentlyContinue
+            } catch {
+                Write-Error 'Cannot get partition information'
+            }
+
             Start-Sleep 0.1
         }
 
@@ -1434,8 +1439,6 @@ function Write-VhdOutput {
             }
             Start-Sleep 1
         }
-
-
     } #Process
     END { } #End
 }  #function Write-VhdOutput.ps1
@@ -1520,8 +1523,10 @@ function Mount-FslDisk {
 
         try {
             # Mount the disk without a drive letter and get it's info, Mount-DiskImage is used to remove reliance on Hyper-V tools
-            $mountedDisk = Mount-DiskImage -ImagePath $Path -NoDriveLetter -PassThru -ErrorAction Stop
+             $MountedDisk = Mount-DiskImage -ImagePath $Path -PassThru -ErrorAction Stop | Get-DiskImage
+             #$mountedDisk = Get-DiskImage -ImagePath $Path
         }
+
         catch {
             $e = $error[0]
             Write-Error "Failed to mount disk - `"$e`""
@@ -1546,7 +1551,7 @@ function Mount-FslDisk {
         }
 
         if ($diskNumber -eq $false) {
-            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction Continue }
             catch {
                 Write-Error 'Could not dismount Disk Due to no Disknumber'
             }
@@ -1564,24 +1569,25 @@ function Mount-FslDisk {
                 if ($allPartition.Type -contains 'Basic') {
                     $partitionType = $true
                     $partition = $allPartition | Where-Object -Property 'Type' -EQ -Value 'Basic'
-                }
-            }
-            catch {
-                if (($allPartition | Measure-Object).Count -gt 0) {
+                } else {
                     $partition = $allPartition | Select-Object -Last 1
-                    $partitionType = $true
+                    if ($partition) {
+                        $partitionType = $true
+                    } else {
+                        $partitionType = $false
+                    }
                 }
-                else{
-
-                    $partitionType = $false
-                }
-
             }
+            
+            catch {
+                Write-Error 'Cannot get partition information'
+            }
+
             Start-Sleep 0.1
         }
 
         if ($partitionType -eq $false) {
-            try { $mountedDisk | Dismount-DiskImage -ErrorAction SilentlyContinue }
+            try { $mountedDisk | Dismount-DiskImage -ErrorAction Continue }
             catch {
                 Write-Error 'Could not dismount disk with no partition'
             }
@@ -1862,11 +1868,14 @@ function Optimize-OneDisk {
         $timespan = (Get-Date).AddSeconds(120)
         $partInfo = $null
         while (($partInfo | Measure-Object).Count -lt 1 -and $timespan -gt (Get-Date)) {
-            try {
-                $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
-            }
-            catch {
+            $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction Stop | Where-Object -Property 'Type' -EQ -Value 'Basic' -ErrorAction Stop
+            if (! $partinfo) {
                 $partInfo = Get-Partition -DiskNumber $mount.DiskNumber -ErrorAction SilentlyContinue | Select-Object -Last 1
+            }
+            try {
+              Get-Variable -Name $partInfo -SilentlyContinue
+            } catch {
+              Write-Error 'Cannot get partition information'
             }
             Start-Sleep 0.1
         }
@@ -2166,7 +2175,7 @@ function Write-VhdOutput {
     $scriptblockInvokeParallel = {
 
         $disk = $_
-
+   
         $paramOptimizeOneDisk = @{
             Disk                = $disk
             DeleteOlderThanDays = $DeleteOlderThanDays
