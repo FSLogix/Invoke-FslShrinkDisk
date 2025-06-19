@@ -2,9 +2,7 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/725c8d2481044524b331d3b207971ddf)](https://www.codacy.com/gh/FSLogix/Invoke-FslShrinkDisk?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=FSLogix/Invoke-FslShrinkDisk&amp;utm_campaign=Badge_Grade)
 
-# Invoke-FslShrinkDisk.ps1
-
-## .Microsoft now supports disk compaction natively in the FSLogix product
+# Microsoft now supports disk compaction natively in the FSLogix product
 Here is the Microsoft docs link for the officiaal feature. <https://learn.microsoft.com/en-us/fslogix/concepts-vhd-disk-compaction>
 FSLogix Disk Compaction is on by default and works extremely well.
 If you have upgraded from an old version of FSLogix the was installed before disk compaction became aavailable you maay have to turn it on.
