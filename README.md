@@ -4,6 +4,11 @@
 
 # Invoke-FslShrinkDisk.ps1
 
+## .Microsoft now supports disk compaction natively in the FSLogix product
+Here is the Microsoft docs link for the officiaal feature. <https://learn.microsoft.com/en-us/fslogix/concepts-vhd-disk-compaction>
+FSLogix Disk Compaction is on by default and works extremely well.
+If you have upgraded from an old version of FSLogix the was installed before disk compaction became aavailable you maay have to turn it on.
+
 ## .SYNOPSIS
 Shrinks FSLogix Profile and O365 dynamically expanding disk(s).
 
